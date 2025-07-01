@@ -3,7 +3,7 @@ from enum import Enum
 from functools import lru_cache
 from typing import Optional, Set
 
-from pydantic import AnyHttpUrl, PostgresDsn
+from pydantic import AnyHttpUrl, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,15 +21,28 @@ class GlobalSettings(BaseSettings):
     DOCS_USERNAME: str = "docs_user"
     DOCS_PASSWORD: str = "simple_password"
 
-    TRUSTED_HOSTS: Set[str] = {"app", "localhost", "0.0.0.0"}
+    TRUSTED_HOSTS: Set[str] = {"app", "localhost", "0.0.0.0", "127.0.0.1"}
     BACKEND_CORS_ORIGINS: Set[AnyHttpUrl] = set()
 
     ENVIRONMENT: EnvironmentEnum
-    DEBUG: bool = False
+    DEBUG: bool = True
 
-    DATABASE_URL: Optional[PostgresDsn] = "postgresql://user:pass@localhost:5434/my_db"
-    DB_ECHO_LOG: bool = False
+    DATABASE_URL: Optional[PostgresDsn] = "postgresql://postgres:postgres@localhost:5432/db"
+    DB_ECHO_LOG: bool = True
 
+    REDIS_URL: Optional[RedisDsn] = "redis://default:password@localhost:6379"
+    REDIS_TLS_URL: Optional[RedisDsn] = "redis://default:password@localhost:6379"
+    REDIS_CACHE_TTL: int = 300
+    
+    MAIL_USER: str = "mymail@gmail.com"
+    MAIL_PASSWORD: str = "mail_password"
+    MAIL_SMTP_SERVER: str = "smtp.gmail.com"
+    MAIL_SMTP_PORT: str = "587"
+
+    TWILIO_ACCOUNT_SID: str = "twilio_account_sid"
+    TWILIO_AUTH_TOKEN: str = "twilio_auth_token"
+    TWILIO_MESSAGING_SERVICE_SID: str = "twilio_message_service_id"
+    
     @property
     def async_database_url(self) -> Optional[str]:
         return (

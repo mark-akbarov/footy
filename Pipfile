@@ -11,8 +11,13 @@ uvicorn = {extras = ["standard"], version = "*"}
 asyncpg = "*"
 tenacity = "*"
 alembic = "*"
-psycopg2-binary = "*"
 sqlalchemy = {extras = ["asyncio"], version = "*"}
+psycopg2 = "*"
+redis = "*"
+twilio = "*"
+aiofiles = "*"
+aiosmtplib = "*"
+celery = "*"
 
 [dev-packages]
 factory-boy = "*"
