@@ -6,7 +6,7 @@ from celery import Celery
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 
-REDIS_URL = "redis://default:password@localhost:6379/0"
+REDIS_URL = "redis://default:password@localhost:6377/0"
 
 BROKER_URL = settings.REDIS_URL
 
@@ -30,7 +30,7 @@ celery_app.conf.update(
     }
 )
 
-celery_app.conf.broker_url = "redis://default:password@localhost:6379"
+celery_app.conf.broker_url = "redis://default:password@localhost:6377"
 
 celery_app.autodiscover_tasks(
     [

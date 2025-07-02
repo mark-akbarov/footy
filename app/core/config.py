@@ -27,11 +27,11 @@ class GlobalSettings(BaseSettings):
     ENVIRONMENT: EnvironmentEnum
     DEBUG: bool = True
 
-    DATABASE_URL: Optional[PostgresDsn] = "postgresql://postgres:postgres@localhost:5432/db"
+    DATABASE_URL: Optional[PostgresDsn] = "postgresql://postgres:postgres@localhost:5434/db"
     DB_ECHO_LOG: bool = True
 
-    REDIS_URL: Optional[RedisDsn] = "redis://default:password@localhost:6379"
-    REDIS_TLS_URL: Optional[RedisDsn] = "redis://default:password@localhost:6379"
+    REDIS_URL: Optional[RedisDsn] = "redis://default:password@localhost:6377"
+    REDIS_TLS_URL: Optional[RedisDsn] = "redis://default:password@localhost:6377"
     REDIS_CACHE_TTL: int = 300
     
     MAIL_USER: str = "mymail@gmail.com"
