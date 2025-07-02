@@ -9,7 +9,7 @@ services:
             - DATABASE_URL=postgresql://user:pass@postgres_db:5432/my_db
             - DB_ECHO_LOG=1
         ports:
-            - "8001:8080"
+            - "8000:8080"
 
     postgres_db:
         image: bitnami/postgresql:latest

@@ -1,11 +1,19 @@
 version: "3"
 
 services:
-    postgres_db:
+    postgres:
         image: bitnami/postgresql:latest
         environment:
-            - POSTGRESQL_USERNAME=user
-            - POSTGRESQL_PASSWORD=pass
-            - POSTGRESQL_DATABASE=my_db
+            - POSTGRESQL_USERNAME=postgres
+            - POSTGRESQL_PASSWORD=postgres
+            - POSTGRESQL_DATABASE=footy
         ports:
             - "5434:5432"
+
+    redis:
+        image: bitnami/redis:7.0
+        environment:
+            - REDIS_PASSWORD=password
+            - REDIS_USER=redis
+        ports:
+            - "6377:6379"
