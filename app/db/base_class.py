@@ -2,7 +2,7 @@ import re
 import datetime
 from typing import Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, DateTime
 from sqlalchemy.orm import as_declarative, declared_attr, mapped_column, Mapped
 from core.config import settings, EnvironmentEnum
 
@@ -19,13 +19,17 @@ def camel_to_snake(name):
 class TimestampedBase:
     id: Mapped[int] = mapped_column(primary_key=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
-        nullable=False, server_default=func.current_timestamp()
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.current_timestamp()
     )
     updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         server_default=func.current_timestamp(),
         onupdate=func.current_timestamp(),
     )
+
     deleted_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         nullable=True, server_default=None
     )

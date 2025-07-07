@@ -1,19 +1,46 @@
 version: "3"
 
 services:
-    app:
-        build:
-            context: .
-            dockerfile: Dockerfile
-        environment:
-            - DATABASE_URL=postgresql://user:pass@postgres_db:5432/my_db
-            - DB_ECHO_LOG=1
-        ports:
-            - "8000:8080"
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./app:/usr/src/app
+    command: [ "/bin/sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload" ]
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:pass@postgres_db:5432/my_db
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    networks:
+      - app-network
 
-    postgres_db:
-        image: bitnami/postgresql:latest
-        environment:
-            - POSTGRESQL_USERNAME=user
-            - POSTGRESQL_PASSWORD=pass
-            - POSTGRESQL_DATABASE=my_db
+
+  postgres_db:
+    image: bitnami/postgresql:latest
+    environment:
+      - POSTGRESQL_USERNAME=user
+      - POSTGRESQL_PASSWORD=pass
+      - POSTGRESQL_DATABASE=my_db
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "user" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+  redis:
+    image: bitnami/redis:7.0
+    environment:
+      - REDIS_PASSWORD=password
+      - REDIS_USER=redis
+    ports:
+      - "6377:6379"
+    networks:
+      - app-network
+networks:
+  app-network:
+    driver: bridge

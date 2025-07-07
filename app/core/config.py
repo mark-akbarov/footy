@@ -18,8 +18,8 @@ class GlobalSettings(BaseSettings):
     PROJECT_NAME: str = "FastAPI Template"
     API_V1_STR: str = "/v1"
 
-    DOCS_USERNAME: str = "docs_user"
-    DOCS_PASSWORD: str = "simple_password"
+    DOCS_USERNAME: str = "admin"
+    DOCS_PASSWORD: str = "admin"
 
     TRUSTED_HOSTS: Set[str] = {"app", "localhost", "0.0.0.0", "127.0.0.1"}
     BACKEND_CORS_ORIGINS: Set[AnyHttpUrl] = set()
@@ -27,11 +27,11 @@ class GlobalSettings(BaseSettings):
     ENVIRONMENT: EnvironmentEnum
     DEBUG: bool = True
 
-    DATABASE_URL: Optional[PostgresDsn] = "postgresql://postgres:postgres@localhost:5434/db"
+    DATABASE_URL: Optional[PostgresDsn] = "postgresql://postgres:12345@postgres:5432/footy"
     DB_ECHO_LOG: bool = True
 
-    REDIS_URL: Optional[RedisDsn] = "redis://default:password@localhost:6377"
-    REDIS_TLS_URL: Optional[RedisDsn] = "redis://default:password@localhost:6377"
+    REDIS_URL: Optional[RedisDsn] = "redis://default:password@redis:6379"
+    REDIS_TLS_URL: Optional[RedisDsn] = "redis://default:password@redis:6379"
     REDIS_CACHE_TTL: int = 300
     
     MAIL_USER: str = "mymail@gmail.com"
@@ -43,6 +43,15 @@ class GlobalSettings(BaseSettings):
     TWILIO_AUTH_TOKEN: str = "twilio_auth_token"
     TWILIO_MESSAGING_SERVICE_SID: str = "twilio_message_service_id"
     
+    # JWT Configuration
+    JWT_SECRET_KEY: str = "your-secret-key-here-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    # File Upload Configuration
+    UPLOAD_DIR: str = "uploads"
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+
     @property
     def async_database_url(self) -> Optional[str]:
         return (

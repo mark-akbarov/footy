@@ -1,4 +1,4 @@
-FROM python:3.10-bullseye as base
+FROM python:3.13-bullseye as base
 
 # Set environment variables
 ENV LANG C.UTF-8
@@ -42,5 +42,5 @@ USER app
 
 EXPOSE 8080
 ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
-CMD [ "gunicorn", "main:app", "--workers", "8", "--worker-class", \
-		"uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080" ]
+#CMD [ "gunicorn", "main:app", "--workers", "8", "--worker-class", \
+#		"uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080" ]

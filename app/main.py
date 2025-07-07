@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
-from fastapi.openapi.docs import get_redoc_html
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -21,7 +21,6 @@ FastAPI template project 🚀
 version = "v0.0.1"
 
 
-
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     redis_url = str(settings.REDIS_URL)
@@ -37,7 +36,7 @@ async def lifespan(_: FastAPI):
     await FastAPILimiter.init(
         redis_client, enabled=settings.ENVIRONMENT != EnvironmentEnum.TEST
     )
-    
+
     yield
     await engine.dispose()
     await redis_client.close()
@@ -67,28 +66,27 @@ app.include_router(v1.api_router)
 @app.get("/openapi.json", include_in_schema=False)
 async def openapi(_: str = Depends(basic_http_credentials)):
     schema = get_openapi(
-        title=settings.PROJECT_NAME + " | API Documentation",
-        description=description,
+        title="My App | API Documentation",
+        version="1.0.0",
+        description="Custom API Docs",
         routes=app.routes,
-        version=version,
     )
-    # schema["info"]["x-logo"] = {
-    #     "url": "https://YOUR_WEBSITE/logo.svg",
-    #     "href": "https://YOUR_WEBSITE/",
-    #     "backgroundColor": "#fff",
-    #     "altText": "YOUR BRAND NAME",
-    # }
     return schema
 
 
-@app.get(
-    "/docs", include_in_schema=False, dependencies=[Depends(basic_http_credentials)]
-)
-async def get_redoc_documentation():
+@app.get("/docs", include_in_schema=False)
+async def swagger_ui(_: str = Depends(basic_http_credentials)):
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="Swagger | API Docs",
+    )
+
+
+@app.get("/redoc", include_in_schema=False)
+async def redoc_ui(_: str = Depends(basic_http_credentials)):
     return get_redoc_html(
         openapi_url="/openapi.json",
-        title="FastAPI | Documentation",
-        # redoc_favicon_url="https://YOUR_WEBSITE/favicon.ico",
+        title="ReDoc | API Docs",
     )
 
 
