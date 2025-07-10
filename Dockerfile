@@ -35,12 +35,11 @@ RUN mkdir "/home/app"
 RUN	chown -R app:app /home/app
 
 COPY ./app /usr/src/app/
-RUN	chown -R app:app /usr/src/app/
-RUN chmod +x /usr/src/app/entrypoint.sh
+RUN chown -R app:app /usr/src/app/
 
 USER app
 
 EXPOSE 8080
-ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
+#ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
 #CMD [ "gunicorn", "main:app", "--workers", "8", "--worker-class", \
 #		"uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080" ]

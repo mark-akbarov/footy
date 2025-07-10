@@ -1,15 +1,17 @@
-from typing import Annotated, Any, AsyncGenerator
-from fastapi import Depends
+from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Depends
+
 from db.session import async_session
 
 
-async def get_db_session() -> AsyncGenerator[Any, Any]:
-    """
-    Dependency function that yields db sessions
-    """
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session() as session:
-        yield session
+        try:
+            yield session
+        finally:
+            await session.close()
 
 
-DbSessionDep = Annotated[AsyncSession, Depends(get_db_session)]
+# Use this in your endpoints
+# DbSessionDep = Depends(get_db_session)

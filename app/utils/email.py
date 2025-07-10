@@ -1,58 +1,92 @@
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-import smtplib
-from string import Template
-from core.config import settings
-from typing import Dict
 import os
-import aiofiles
-import aiosmtplib
+from typing import Dict, Optional
+from jinja2 import Environment, FileSystemLoader
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
+from core.config import settings
 
-MAIL_SMTP_SERVER = settings.MAIL_SMTP_SERVER
-MAIL_SMTP_PORT = settings.MAIL_SMTP_PORT
-MAIL_SMTP_USERNAME = settings.MAIL_USER
-MAIL_SMTP_PASSWORD = settings.MAIL_PASSWORD
-MAIL_DISPLAY_NAME = "Footy"
+# Initialize Jinja2 environment
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates", "email")
+env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
+
+
+class EmailManager:
+    @staticmethod
+    def render_template(template_name: str, context: Dict[str, str]) -> str:
+        """Render an email template with the given context."""
+        template = env.get_template(f"{template_name}.html")
+        return template.render(**context)
+
+    @staticmethod
+    def send_email(
+            to_email: str,
+            subject: str,
+            html_content: str,
+            to_name: Optional[str] = None
+    ) -> bool:
+        """Send an email using Brevo API v3."""
+        try:
+            # Configure API key
+            configuration = sib_api_v3_sdk.Configuration()
+            configuration.api_key['api-key'] = settings.BREVO_API_KEY
+
+            # Create an instance of the API class
+            api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+                sib_api_v3_sdk.ApiClient(configuration)
+            )
+
+            # Prepare the email
+            send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+                to=[{
+                    "email": to_email,
+                    "name": to_name or to_email
+                }],
+                sender={
+                    "name": settings.MAIL_FROM_NAME,
+                    "email": settings.MAIL_FROM
+                },
+                subject=subject,
+                html_content=html_content
+            )
+
+            # Make the API call
+            result = api_instance.send_transac_email(send_smtp_email)
+            print(f"Email sent successfully. Message ID: {result}")
+            return True
+
+        except ApiException as e:
+            print(f"Error sending email via Brevo API:")
+            print(f"Status code: {e.status}")
+            print(f"Reason: {e.reason}")
+            print(f"Body: {e.body}")
+            return False
+        except Exception as e:
+            print(f"Unexpected error sending email: {e}")
+            return False
 
 
 def send_mail(
-    mail_to: str,
-    mail_subject: str,
-    mail_template_name: str,
-    mail_context: Dict[str, str]
-):
+        to_email: str,
+        subject: str,
+        template_name: str,
+        context: Dict[str, str],
+        to_name: Optional[str] = None
+) -> bool:
+    """High-level function to send an email using a template."""
+    email_manager = EmailManager()
 
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    templates_dir = os.path.join(current_dir, 'mail_templates')
-    file_path = os.path.join(templates_dir, f"{mail_template_name}.html")
+    try:
+        # Render the template
+        html_content = email_manager.render_template(template_name, context)
 
-    with open(f"{file_path}") as file:
-        template_content = file.read()
-
-    template = Template(template_content)
-    email_body = template.substitute(mail_context)
-
-    # Create the email message
-    message = MIMEMultipart()
-    message['From'] = f"{MAIL_DISPLAY_NAME} <{MAIL_SMTP_USERNAME}>"
-    message['To'] = mail_to
-    message['Subject'] = mail_subject
-
-    message.attach(MIMEText(email_body, 'html'))
-
-    with smtplib.SMTP(MAIL_SMTP_SERVER, MAIL_SMTP_PORT, timeout=20) as server:
-        server.starttls()
-        server.login(MAIL_SMTP_USERNAME, MAIL_SMTP_PASSWORD)
-        server.sendmail(MAIL_SMTP_USERNAME, [message['To']], message.as_string())
-
-
-async def send_verification_code_email(email: str, email_body: str):
-    message = MIMEMultipart()
-    message['From'] = f"{MAIL_DISPLAY_NAME} <{MAIL_SMTP_USERNAME}>"
-    message['To'] = email
-    message['Subject'] = "Carriving verification code"
-    message.attach(MIMEText(email_body, 'plain'))
-    with smtplib.SMTP(MAIL_SMTP_SERVER, MAIL_SMTP_PORT, timeout=20) as server:
-        server.starttls()
-        server.login(MAIL_SMTP_USERNAME, MAIL_SMTP_PASSWORD)
-        server.sendmail(MAIL_SMTP_USERNAME, [email], message.as_string())
+        # Send the email
+        return email_manager.send_email(
+            to_email=to_email,
+            subject=subject,
+            html_content=html_content,
+            to_name=to_name
+        )
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False

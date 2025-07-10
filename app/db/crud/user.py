@@ -42,13 +42,16 @@ class UsersCrud(
     def _paginated_schema(self) -> Type[PaginatedUserSchema]:
         return PaginatedUserSchema
 
-    async def get_by_email(self, email: EmailStr) -> Optional[UserTable]:
+    async def get_by_email(self, email: str) -> Optional[UserTable]:
         """Get user by email."""
-        query = select(UserTable).where(UserTable.email == email)
-        result = await self._db_session.execute(query)
-        return result.scalars().first()
-
-
+        try:
+            stmt = select(self._table).where(self._table.email == email)
+            result = await self._db_session.execute(stmt)
+            user = result.scalar_one_or_none()
+            return user
+        except Exception as e:
+            print(f"Error in get_by_email: {str(e)}")
+            return None
 
     async def get_candidates(self, limit: int = 20, offset: int = 0) -> List[UserTable]:
         """Get all candidates."""
@@ -83,7 +86,8 @@ class UsersCrud(
         result = await self._db_session.execute(query)
         return result.scalars().all()
 
-    async def search_candidates(self, search_params: CandidateSearchSchema, limit: int = 20, offset: int = 0) -> List[UserTable]:
+    async def search_candidates(self, search_params: CandidateSearchSchema, limit: int = 20, offset: int = 0) -> List[
+        UserTable]:
         """Search candidates with filters."""
         query = select(UserTable).where(
             and_(
@@ -91,19 +95,19 @@ class UsersCrud(
                 UserTable.is_active == True
             )
         )
-        
+
         if search_params.role:
             query = query.where(UserTable.position.ilike(f"%{search_params.role}%"))
-        
+
         if search_params.location:
             query = query.where(UserTable.location.ilike(f"%{search_params.location}%"))
-        
+
         if search_params.experience_level:
             query = query.where(UserTable.experience_level == search_params.experience_level)
-        
+
         if search_params.position:
             query = query.where(UserTable.position.ilike(f"%{search_params.position}%"))
-        
+
         query = query.limit(limit).offset(offset)
         result = await self._db_session.execute(query)
         return result.scalars().all()

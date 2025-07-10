@@ -30,24 +30,26 @@ class GlobalSettings(BaseSettings):
     DATABASE_URL: Optional[PostgresDsn] = "postgresql://postgres:12345@postgres:5432/footy"
     DB_ECHO_LOG: bool = True
 
-    REDIS_URL: Optional[RedisDsn] = "redis://default:password@redis:6379"
-    REDIS_TLS_URL: Optional[RedisDsn] = "redis://default:password@redis:6379"
-    REDIS_CACHE_TTL: int = 300
-    
-    MAIL_USER: str = "mymail@gmail.com"
-    MAIL_PASSWORD: str = "mail_password"
-    MAIL_SMTP_SERVER: str = "smtp.gmail.com"
+    REDIS_HOST: str = "redis"  # This should match your service name in docker-compose
+    REDIS_PORT: int = 6379
+    REDIS_URL: str = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+
+    MAIL_USER: str = ""
+    BREVO_API_KEY: str = ""
+    MAIL_SMTP_SERVER: str = ""
     MAIL_SMTP_PORT: str = "587"
+    MAIL_FROM: str = ""
+    MAIL_FROM_NAME: str = ""
 
     TWILIO_ACCOUNT_SID: str = "twilio_account_sid"
     TWILIO_AUTH_TOKEN: str = "twilio_auth_token"
     TWILIO_MESSAGING_SERVICE_SID: str = "twilio_message_service_id"
-    
+
     # JWT Configuration
     JWT_SECRET_KEY: str = "your-secret-key-here-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    
+
     # File Upload Configuration
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB

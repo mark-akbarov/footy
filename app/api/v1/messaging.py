@@ -1,8 +1,9 @@
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies.database import DbSessionDep
+from api.dependencies.database import get_db_session
 from db.crud.message import MessageCrud
 from db.crud.user import UsersCrud
 from db.tables.user import UserRole
@@ -25,7 +26,7 @@ router = APIRouter(
 @router.post("", response_model=OutMessageSchema, status_code=status.HTTP_201_CREATED)
 async def send_message(
     message_data: CreateMessageSchema,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(get_current_active_user)
 ):
     """Send a message to another user."""
@@ -59,7 +60,7 @@ async def send_message(
 
 @router.get("/threads", response_model=List[MessageThreadSchema])
 async def get_message_threads(
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(get_current_active_user)
 ):
     """Get message threads for current user."""
@@ -72,7 +73,7 @@ async def get_message_threads(
 @router.get("/conversation/{user_id}", response_model=List[OutMessageSchema])
 async def get_conversation(
     user_id: int,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(get_current_active_user)
 ):
     """Get conversation with a specific user."""
@@ -98,7 +99,7 @@ async def get_conversation(
 
 @router.get("/unread", response_model=List[OutMessageSchema])
 async def get_unread_messages(
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(get_current_active_user)
 ):
     """Get all unread messages for current user."""
@@ -111,7 +112,7 @@ async def get_unread_messages(
 @router.patch("/{message_id}/read", response_model=OutMessageSchema)
 async def mark_message_as_read(
     message_id: int,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(get_current_active_user)
 ):
     """Mark a message as read."""
@@ -139,7 +140,7 @@ async def mark_message_as_read(
 @router.get("/{message_id}", response_model=OutMessageSchema)
 async def get_message(
     message_id: int,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(get_current_active_user)
 ):
     """Get a specific message."""
@@ -166,7 +167,7 @@ async def get_message(
 async def reply_to_message(
     message_id: int,
     reply_content: CreateMessageSchema,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(get_current_active_user)
 ):
     """Reply to a specific message."""
@@ -208,7 +209,7 @@ async def reply_to_message(
 @router.get("/{message_id}/replies", response_model=List[OutMessageSchema])
 async def get_message_replies(
     message_id: int,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(get_current_active_user)
 ):
     """Get all replies to a message."""

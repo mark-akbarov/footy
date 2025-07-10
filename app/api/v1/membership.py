@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends, status
 import stripe
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies.database import DbSessionDep
+from api.dependencies.database import get_db_session
 from db.crud.membership import MembershipCrud
 from db.crud.user import UsersCrud
 from db.tables.user import UserRole
@@ -57,8 +58,8 @@ def require_candidate_role(current_user: OutUserSchema = Depends(get_current_act
 @router.post("/create-payment-intent")
 async def create_payment_intent(
     payment_data: CreatePaymentIntentSchema,
-    db: DbSessionDep,
-    current_user: OutUserSchema = Depends(require_candidate_role)
+    current_user: OutUserSchema = Depends(require_candidate_role),
+    db: AsyncSession = Depends(get_db_session)
 ):
     """Create a Stripe payment intent for membership subscription."""
     try:
@@ -107,7 +108,7 @@ async def create_payment_intent(
 @router.post("/confirm-payment", response_model=OutMembershipSchema)
 async def confirm_payment(
     payment_data: PaymentConfirmationSchema,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_candidate_role)
 ):
     """Confirm payment and activate membership."""
@@ -163,7 +164,7 @@ async def confirm_payment(
 
 @router.get("/my-membership", response_model=OutMembershipSchema)
 async def get_my_membership(
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_candidate_role)
 ):
     """Get current user's active membership."""
@@ -181,7 +182,7 @@ async def get_my_membership(
 
 @router.get("/history", response_model=List[OutMembershipSchema])
 async def get_membership_history(
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_candidate_role)
 ):
     """Get membership history for current user."""
@@ -194,7 +195,7 @@ async def get_membership_history(
 @router.post("/upgrade")
 async def upgrade_membership(
     new_plan: CreatePaymentIntentSchema,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_candidate_role)
 ):
     """Upgrade membership plan."""

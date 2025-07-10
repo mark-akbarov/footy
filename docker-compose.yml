@@ -35,10 +35,25 @@ services:
   redis:
     image: bitnami/redis:7.0
     environment:
-      - REDIS_PASSWORD=password
-      - REDIS_USER=redis
+      - ALLOW_EMPTY_PASSWORD=yes  # For development only
     ports:
-      - "6377:6379"
+      - "6379:6379"  # Changed from 6377 to standard Redis port
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A celery_config worker --loglevel=info
+    volumes:
+      - ./app:/usr/src/app
+    depends_on:
+      - redis
     networks:
       - app-network
 networks:

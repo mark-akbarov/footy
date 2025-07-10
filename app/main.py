@@ -6,9 +6,9 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.cors import CORSMiddleware
 import redis.asyncio as aioredis
 
-from core.config import settings, EnvironmentEnum
 from api.dependencies.docs_security import basic_http_credentials
 from api.dependencies.rate_limiter import FastAPILimiter
+from core.config import settings, EnvironmentEnum
 from utils.redis_manager import RedisManager
 
 from db.session import engine
@@ -26,20 +26,29 @@ async def lifespan(_: FastAPI):
     redis_url = str(settings.REDIS_URL)
 
     redis_pool = aioredis.ConnectionPool.from_url(
-        redis_url, encoding="utf-8", decode_responses=True
+        redis_url,
+        encoding="utf-8",
+        decode_responses=True
     )
     redis_client = aioredis.Redis.from_pool(redis_pool)
-    await redis_client.ping()
+
+    try:
+        await redis_client.ping()
+    except Exception as e:
+        print(f"Failed to connect to Redis: {e}")
+        raise
 
     RedisManager.set_client(redis_client)
 
     await FastAPILimiter.init(
-        redis_client, enabled=settings.ENVIRONMENT != EnvironmentEnum.TEST
+        redis_client,
+        enabled=settings.ENVIRONMENT != EnvironmentEnum.TEST
     )
 
     yield
-    await engine.dispose()
+
     await redis_client.close()
+    await engine.dispose()
 
 
 app = FastAPI(

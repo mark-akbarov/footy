@@ -7,19 +7,19 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies.database import DbSessionDep
+from api.dependencies.database import get_db_session
 from db.crud.user import UsersCrud
 from db.tables.user import UserRole
 from schemas.user import (
     CandidateRegistrationSchema,
     TeamRegistrationSchema,
-    UserLoginSchema,
     OutUserSchema
 )
 from core.config import settings
-from utils.redis_manager import redis_client
+from utils.redis_manager import RedisManager
 from tasks.notifications.send_email import send_email_task
 
 router = APIRouter(
@@ -41,15 +41,6 @@ class Token(BaseModel):
     token_type: str
 
 
-class TokenData(BaseModel):
-    email: Optional[str] = None
-
-
-class EmailVerificationSchema(BaseModel):
-    email: str
-    code: str
-
-
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -69,7 +60,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db=DbSessionDep) -> OutUserSchema:
+async def get_current_user(
+        token: str = Depends(oauth2_scheme),
+        db: AsyncSession = Depends(get_db_session)
+) -> OutUserSchema:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -80,12 +74,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db=DbSessionDep)
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
-        token_data = TokenData(email=email)
     except JWTError:
         raise credentials_exception
 
     user_crud = UsersCrud(db)
-    user = await user_crud.get_by_email(email=token_data.email)
+    user = await user_crud.get_by_email(email=email)
     if user is None:
         raise credentials_exception
     return OutUserSchema.model_validate(user)
@@ -99,8 +92,8 @@ async def get_current_active_user(current_user: OutUserSchema = Depends(get_curr
 
 @router.post("/register-candidate", response_model=OutUserSchema, status_code=status.HTTP_201_CREATED)
 async def register_candidate(
-    candidate_data: CandidateRegistrationSchema,
-    db: DbSessionDep
+        candidate_data: CandidateRegistrationSchema,
+        db: AsyncSession = Depends(get_db_session)
 ):
     """Register a new candidate."""
     user_crud = UsersCrud(db)
@@ -129,18 +122,16 @@ async def register_candidate(
     # Send email verification
     verification_code = generate_verification_code()
     redis_key = f"email_verification:{candidate_data.email}:{user.id}"
-    await redis_client.set(redis_key, verification_code, ex=300)  # 5 minutes
+    await RedisManager.set(redis_key, verification_code, ex=300)  # 5 minutes
 
-    # Send verification email
-    email_context = {
-        "first_name": candidate_data.first_name,
-        "verification_code": verification_code
-    }
     send_email_task.delay(
-        candidate_data.email,
-        "Verify Your Footy Account",
-        "verification",
-        email_context
+        to_email=candidate_data.email,
+        subject="Verify Your Footy Account",
+        template="verification",
+        context={
+            "first_name": candidate_data.first_name,
+            "verification_code": verification_code
+        }
     )
 
     return OutUserSchema.model_validate(user)
@@ -148,10 +139,8 @@ async def register_candidate(
 
 @router.post("/register-team", response_model=OutUserSchema, status_code=status.HTTP_201_CREATED)
 async def register_team(
-    team_data: TeamRegistrationSchema,
-    db: DbSessionDep
-):
-    print(111111111111111111111111111111111111111111111111111)
+        team_data: TeamRegistrationSchema,
+        db: AsyncSession = Depends(get_db_session)):
     """Register a new team."""
     user_crud = UsersCrud(db)
 
@@ -180,18 +169,16 @@ async def register_team(
     # Send email verification
     verification_code = generate_verification_code()
     redis_key = f"email_verification:{team_data.email}:{user.id}"
-    await redis_client.set(redis_key, verification_code, ex=300)  # 5 minutes
+    await RedisManager.set(redis_key, verification_code, ex=300)  # 5 minutes
 
-    # Send verification email
-    email_context = {
-        "first_name": team_data.first_name,
-        "verification_code": verification_code
-    }
     send_email_task.delay(
-        team_data.email,
-        "Verify Your Footy Account",
-        "verification",
-        email_context
+        to_email=user.email,
+        subject="Verify Your Footy Account",
+        template="verification",
+        context={
+            "first_name": user.first_name,
+            "verification_code": verification_code
+        }
     )
 
     return OutUserSchema.model_validate(user)
@@ -199,30 +186,35 @@ async def register_team(
 
 @router.post("/login", response_model=Token)
 async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db=DbSessionDep
-):
-    """Login user."""
+        form_data: OAuth2PasswordRequestForm = Depends(),
+        db: AsyncSession = Depends(get_db_session)):
+    """Login user with email and password."""
     user_crud = UsersCrud(db)
     user = await user_crud.get_by_email(form_data.username)
-
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account is not active. Please verify your email first."
+            detail="Account is not active. Please verify your email first."
         )
 
     if not user.email_verified:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Please verify your email address before logging in."
+        )
+
+    # For teams, check if they are approved
+    if user.role == UserRole.TEAM and not user.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Your team account is pending approval."
         )
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -238,87 +230,22 @@ async def read_users_me(current_user: OutUserSchema = Depends(get_current_active
     return current_user
 
 
-@router.post("/resend-verification")
-async def resend_verification(email: str, db: DbSessionDep):
-    """Resend verification email."""
-    user_crud = UsersCrud(db)
-    user = await user_crud.get_by_email(email)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-
-    if user.email_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already verified"
-        )
-
-    # Generate new verification code
-    verification_code = generate_verification_code()
-    redis_key = f"email_verification:{email}:{user.id}"
-    await redis_client.set(redis_key, verification_code, ex=300)  # 5 minutes
-
-    # Send verification email
-    email_context = {
-        "first_name": user.first_name,
-        "verification_code": verification_code
-    }
-    send_email_task.delay(
-        email,
-        "Verify Your Footy Account",
-        "verification",
-        email_context
-    )
-
-    return {"message": "Verification email sent successfully"}
-
-
 def generate_verification_code() -> str:
     """Generate a 6-digit verification code."""
     return ''.join(random.choices(string.digits, k=6))
 
 
-@router.post("/send-email-verification")
-async def send_email_verification(
-    email: str,
-    user_id: int,
-    db: DbSessionDep
-):
-    """Send email verification code."""
-    # Generate verification code
-    verification_code = generate_verification_code()
-
-    # Store code in Redis with 5-minute expiry
-    redis_key = f"email_verification:{email}:{user_id}"
-    await redis_client.set(redis_key, verification_code, ex=300)  # 5 minutes
-
-    # Send verification email
-    email_context = {
-        "verification_code": verification_code
-    }
-    send_email_task.delay(
-        email,
-        "Verify Your Footy Account",
-        "verification",
-        email_context
-    )
-
-    return {"message": "Verification code sent successfully"}
-
-
 @router.post("/verify-email")
 async def verify_email(
-    verification_data: EmailVerificationSchema,
-    db: DbSessionDep
+        email: str,
+        code: int,
+        db: AsyncSession = Depends(get_db_session)
 ):
     """Verify email code and activate user."""
     user_crud = UsersCrud(db)
 
     # Get user by email
-    user = await user_crud.get_by_email(verification_data.email)
+    user = await user_crud.get_by_email(email)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -326,10 +253,10 @@ async def verify_email(
         )
 
     # Check verification code
-    redis_key = f"email_verification:{verification_data.email}:{user.id}"
-    stored_code = await redis_client.get(redis_key)
+    redis_key = f"email_verification:{email}:{user.id}"
+    stored_code = await RedisManager.get(redis_key)
 
-    if not stored_code or stored_code != verification_data.code:
+    if not stored_code or stored_code != str(code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired verification code"
@@ -341,6 +268,6 @@ async def verify_email(
     await user_crud.commit_session()
 
     # Delete verification code
-    await redis_client.delete(redis_key)
+    await RedisManager.delete(redis_key)
 
     return {"message": "Email verified successfully, account activated"}

@@ -1,8 +1,9 @@
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies.database import DbSessionDep
+from api.dependencies.database import get_db_session
 from db.crud.application import ApplicationCrud
 from db.crud.vacancy import VacancyCrud
 from db.tables.user import UserRole
@@ -44,7 +45,7 @@ def require_team_role(current_user: OutUserSchema = Depends(get_current_active_u
 @router.post("", response_model=OutApplicationSchema, status_code=status.HTTP_201_CREATED)
 async def apply_to_vacancy(
     application_data: CreateApplicationSchema,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_candidate_role)
 ):
     """Apply to a vacancy."""
@@ -81,7 +82,7 @@ async def apply_to_vacancy(
 
 @router.get("/my-applications", response_model=List[OutApplicationSchema])
 async def get_my_applications(
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_candidate_role)
 ):
     """Get all applications for the current candidate."""
@@ -93,7 +94,7 @@ async def get_my_applications(
 
 @router.get("/pending", response_model=List[OutApplicationSchema])
 async def get_pending_applications(
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_team_role)
 ):
     """Get all pending applications for the current team's vacancies."""
@@ -106,7 +107,7 @@ async def get_pending_applications(
 @router.get("/vacancy/{vacancy_id}", response_model=List[OutApplicationSchema])
 async def get_applications_for_vacancy(
     vacancy_id: int,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_team_role)
 ):
     """Get all applications for a specific vacancy."""
@@ -136,7 +137,7 @@ async def get_applications_for_vacancy(
 async def update_application_status(
     application_id: int,
     status_data: ApplicationStatusUpdateSchema,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_team_role)
 ):
     """Update application status (accept/decline)."""
@@ -170,7 +171,7 @@ async def update_application_status(
 @router.get("/{application_id}", response_model=OutApplicationSchema)
 async def get_application(
     application_id: int,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(get_current_active_user)
 ):
     """Get a specific application."""
@@ -205,7 +206,7 @@ async def get_application(
 @router.delete("/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def withdraw_application(
     application_id: int,
-    db: DbSessionDep,
+    db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_candidate_role)
 ):
     """Withdraw an application."""

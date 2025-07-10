@@ -23,6 +23,7 @@ python-multipart = "*"
 bcrypt = "==4.0.1"
 stripe = "*"
 python-jose = {extras = ["cryptography"], version = "*"}
+sib-api-v3-sdk = "*"
 
 [dev-packages]
 factory-boy = "*"
