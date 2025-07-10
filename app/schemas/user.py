@@ -40,7 +40,7 @@ class TeamRegistrationSchema(UserSchemaBase):
     club_name: str
     contact_phone: Optional[str] = None
     
-    @validator('role')
+    @field_validator('role')
     def validate_role(cls, v):
         if v != UserRole.TEAM:
             raise ValueError('Role must be team for team registration')
