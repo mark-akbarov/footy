@@ -66,14 +66,16 @@ app = FastAPI(
     openapi_url=None,
 )
 
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.TRUSTED_HOSTS)
+app.add_middleware(TrustedHostMiddleware)
 
 # include routes here
 app.include_router(v1.api_router)
 
 
 @app.get("/openapi.json", include_in_schema=False)
-async def openapi(_: str = Depends(basic_http_credentials)):
+async def openapi(
+    _: str = Depends(basic_http_credentials)
+):
     schema = get_openapi(
         title="My App | API Documentation",
         version="1.0.0",
@@ -84,7 +86,9 @@ async def openapi(_: str = Depends(basic_http_credentials)):
 
 
 @app.get("/docs", include_in_schema=False)
-async def swagger_ui(_: str = Depends(basic_http_credentials)):
+async def swagger_ui(
+    _: str = Depends(basic_http_credentials)
+):
     return get_swagger_ui_html(
         openapi_url="/openapi.json",
         title="Swagger | API Docs",
