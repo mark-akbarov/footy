@@ -27,28 +27,25 @@ class GlobalSettings(BaseSettings):
     ENVIRONMENT: EnvironmentEnum
     DEBUG: bool = True
 
-    DATABASE_URL: Optional[PostgresDsn] = "postgresql://postgres:12345@postgres:5432/footy"
+    DATABASE_URL: Optional[PostgresDsn] = None
     DB_ECHO_LOG: bool = True
 
-    REDIS_HOST: str = "redis"  # This should match your service name in docker-compose
-    REDIS_PORT: int = 6379
-    REDIS_URL: str = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+    REDIS_URL: Optional[RedisDsn] = None
 
-    MAIL_USER: str = ""
-    BREVO_API_KEY: str = ""
-    MAIL_SMTP_SERVER: str = ""
-    MAIL_SMTP_PORT: str = "587"
-    MAIL_FROM: str = ""
-    MAIL_FROM_NAME: str = ""
-
-    TWILIO_ACCOUNT_SID: str = "twilio_account_sid"
-    TWILIO_AUTH_TOKEN: str = "twilio_auth_token"
-    TWILIO_MESSAGING_SERVICE_SID: str = "twilio_message_service_id"
+    BREVO_API_KEY: str
+    MAIL_SMTP_PORT: str
+    MAIL_FROM: str
+    MAIL_FROM_NAME: str
 
     # JWT Configuration
-    JWT_SECRET_KEY: str = "your-secret-key-here-change-in-production"
+    JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # Stripe Configuration
+    STRIPE_SECRET_KEY: str
+    STRIPE_PUBLISHABLE_KEY: str
+    STRIPE_WEBHOOK_SECRET: str
 
     # File Upload Configuration
     UPLOAD_DIR: str = "uploads"
@@ -62,7 +59,7 @@ class GlobalSettings(BaseSettings):
             else str(self.DATABASE_URL)
         )
 
-    model_config = SettingsConfigDict(case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True)
 
 
 class TestSettings(GlobalSettings):

@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 import stripe
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,8 +25,8 @@ router = APIRouter(
     tags=["Memberships"],
 )
 
-# Stripe configuration (in production, use environment variables)
-stripe.api_key = "sk_test_..."  # Replace with your Stripe secret key
+# Stripe configuration
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 # Membership pricing
 MEMBERSHIP_PRICES = {
@@ -291,4 +291,92 @@ async def get_membership_plans():
                 ]
             }
         ]
-    } 
+    }
+
+
+@router.post("/webhook")
+async def stripe_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """Handle Stripe webhooks for payment confirmations."""
+    try:
+        # Get the webhook payload
+        payload = await request.body()
+        sig_header = request.headers.get('stripe-signature')
+        
+        if not sig_header:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No signature header"
+            )
+        
+        # Verify webhook signature
+        try:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid payload"
+            )
+        except stripe.error.SignatureVerificationError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid signature"
+            )
+        
+        # Handle the event
+        if event['type'] == 'payment_intent.succeeded':
+            payment_intent = event['data']['object']
+            await handle_payment_success(payment_intent, db)
+        elif event['type'] == 'payment_intent.payment_failed':
+            payment_intent = event['data']['object']
+            await handle_payment_failure(payment_intent, db)
+        
+        return {"status": "success"}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Webhook error: {str(e)}"
+        )
+
+
+async def handle_payment_success(payment_intent: dict, db: AsyncSession):
+    """Handle successful payment."""
+    membership_crud = MembershipCrud(db)
+    user_crud = UsersCrud(db)
+    
+    user_id = int(payment_intent['metadata'].get('user_id'))
+    plan_type = MembershipPlan(payment_intent['metadata'].get('plan_type'))
+    
+    # Check if membership already exists
+    existing_membership = await membership_crud.get_active_membership_by_user_id(user_id)
+    if existing_membership:
+        return  # Already processed
+    
+    start_date = datetime.utcnow()
+    renewal_date = start_date + timedelta(days=30)
+    
+    membership_data = {
+        "user_id": user_id,
+        "plan_type": plan_type,
+        "status": MembershipStatus.ACTIVE,
+        "price": MEMBERSHIP_PRICES[plan_type],
+        "start_date": start_date,
+        "renewal_date": renewal_date,
+        "stripe_payment_intent_id": payment_intent['id']
+    }
+    
+    await membership_crud.create(membership_data)
+    await user_crud.activate_user(user_id)
+    await membership_crud.commit_session()
+
+
+async def handle_payment_failure(payment_intent: dict, db: AsyncSession):
+    """Handle failed payment."""
+    # Log the failure for monitoring
+    print(f"Payment failed for user {payment_intent['metadata'].get('user_id')}")
+    # In production, you might want to send an email to the user 

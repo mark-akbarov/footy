@@ -205,7 +205,19 @@ async def upload_cv(
         file: UploadFile = File(...)
 ):
     """Upload CV file for the current candidate."""
+    from db.crud.membership import MembershipCrud
+    from db.tables.membership import MembershipStatus
+    
     user_crud = UsersCrud(db)
+    membership_crud = MembershipCrud(db)
+
+    # Check if user has active membership
+    active_membership = await membership_crud.get_active_membership_by_user_id(current_user.id)
+    if not active_membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Active membership required to upload CV. Please purchase a membership first."
+        )
 
     if not file.filename:
         raise HTTPException(

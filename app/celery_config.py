@@ -11,8 +11,8 @@ BROKER_URL = settings.REDIS_URL
 
 celery_app = Celery(
     "worker",
-    backend=f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/0",
-    broker=f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/0"
+    backend=f"{BROKER_URL}",
+    broker=f"{BROKER_URL}"
 )
 
 celery_app.conf.update(
