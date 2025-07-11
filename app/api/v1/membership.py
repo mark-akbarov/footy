@@ -1,8 +1,9 @@
 from typing import List, Optional
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Depends, status, Request
 import stripe
+from asyncer import asyncify
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,7 @@ from schemas.membership import (
 from schemas.user import OutUserSchema
 from api.v1.authentication import get_current_active_user
 from core.config import settings
+from utils.stripe_utils import create_stripe_checkout_session, get_checkout_items
 
 
 router = APIRouter(
@@ -56,6 +58,71 @@ def require_candidate_role(current_user: OutUserSchema = Depends(get_current_act
     return current_user
 
 
+@router.post(
+    "/create-checkout-session",
+    name="Route for creating a checkout session",
+    description="Returns checkout session client secret",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Not found"},
+        status.HTTP_403_FORBIDDEN: {"description": "Cannot pay"},
+    },
+)
+async def create_checkout_session(
+    payment_data: CreatePaymentIntentSchema,
+    current_user: OutUserSchema = Depends(require_candidate_role),
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    try:
+        membership_crud = MembershipCrud(db_session)
+        active_membership = await membership_crud.get_active_membership_by_user_id(current_user.id)
+        
+        if active_membership:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You already have an active membership"
+            )
+
+        amount = MEMBERSHIP_PRICES.get(payment_data.plan_type)
+        if not amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid membership plan"
+            )
+
+        amount *= 100
+        items = await get_checkout_items(price=int(amount))
+        session = await create_stripe_checkout_session(items=items, customer_email=current_user.email)  
+        
+        return {
+            'checkout_session_id': session.id, 
+            'client_secret': session.client_secret, 
+            'payment_intent': session.payment_intent
+        }
+        
+    except stripe.error.StripeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Stripe error: {str(e)}"
+        )
+
+
+@router.get(
+    '/get-checkout-session',
+    name="Route for getting checkout session",
+)
+async def get_checkout_session(
+    session_id: str,
+):
+    session = await asyncify(stripe.checkout.Session.retrieve)(session_id)
+    return {
+        'status': session.status,
+        'customer_email': session.customer_details.email,
+        'payment_intent': session.payment_intent,
+    }
+
+
+
 @router.post("/create-payment-intent")
 async def create_payment_intent(
     payment_data: CreatePaymentIntentSchema,
@@ -74,7 +141,6 @@ async def create_payment_intent(
                 detail="You already have an active membership"
             )
         
-        # Get price for the plan
         amount = MEMBERSHIP_PRICES.get(payment_data.plan_type)
         if not amount:
             raise HTTPException(
@@ -82,9 +148,8 @@ async def create_payment_intent(
                 detail="Invalid membership plan"
             )
         
-        # Create payment intent
         intent = stripe.PaymentIntent.create(
-            amount=int(amount * 100),  # Amount in cents
+            amount=int(amount * 100),
             currency='usd',
             metadata={
                 'user_id': current_user.id,
@@ -95,6 +160,7 @@ async def create_payment_intent(
         
         return {
             "client_secret": intent.client_secret,
+            "payment_intent_id": intent.id,
             "amount": amount,
             "currency": "usd"
         }
@@ -134,7 +200,7 @@ async def confirm_payment(
         membership_crud = MembershipCrud(db)
         user_crud = UsersCrud(db)
         
-        start_date = datetime.utcnow()
+        start_date = datetime.now()
         renewal_date = start_date + timedelta(days=30)  # 30-day subscription
         
         membership_data = {
@@ -149,7 +215,6 @@ async def confirm_payment(
         
         membership = await membership_crud.create(membership_data)
         
-        # Activate user account
         await user_crud.activate_user(current_user.id)
         
         await membership_crud.commit_session()
