@@ -90,8 +90,7 @@ async def create_checkout_session(
                 detail="Invalid membership plan"
             )
 
-        amount *= 100
-        items = await get_checkout_items(price=int(amount))
+        items = await get_checkout_items(price=int(amount*100))
         session = await create_stripe_checkout_session(items=items, customer_email=current_user.email)  
         
         return {
