@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "dbc52714cbd06f139d79e0611c99792a6e302471bdadcb8399d806cbed7babc9"
+            "sha256": "2f42aeb709b6a6b7acaf93bbbdf1cdeb24e41b7769fc020d2f5b0208ad629f2e"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -182,6 +182,15 @@
             ],
             "markers": "python_version >= '3.9'",
             "version": "==4.9.0"
+        },
+        "asyncer": {
+            "hashes": [
+                "sha256:5920d48fc99c8f8f0f1576e1882f5022885589c5fcbc46ce4224ec3e53776eeb",
+                "sha256:a589d980f57e20efb07ed91d0dbe67f1d2fd343e7142c66d3a099f05c620739c"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.8'",
+            "version": "==0.0.8"
         },
         "asyncpg": {
             "hashes": [
@@ -576,6 +585,14 @@
             ],
             "markers": "python_version >= '3.8'",
             "version": "==2.2.0"
+        },
+        "exceptiongroup": {
+            "hashes": [
+                "sha256:4d111e6e0c13d0644cad6ddaa7ed0261a0b36971f6d23e7ec9b4b9097da78a10",
+                "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88"
+            ],
+            "markers": "python_version >= '3.7'",
+            "version": "==1.3.0"
         },
         "fastapi": {
             "extras": [

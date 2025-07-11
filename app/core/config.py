@@ -38,15 +38,19 @@ class GlobalSettings(BaseSettings):
     MAIL_FROM: str
     MAIL_FROM_NAME: str
 
+    TWILIO_ACCOUNT_SID: str = ''
+    TWILIO_AUTH_TOKEN: str = ''
+    TWILIO_MESSAGING_SERVICE_SID: str = ''
+
     # JWT Configuration
-    JWT_SECRET_KEY: str
+    JWT_SECRET_KEY: str = ''
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # Stripe Configuration
-    STRIPE_SECRET_KEY: str
-    STRIPE_PUBLISHABLE_KEY: str
-    STRIPE_WEBHOOK_SECRET: str
+    STRIPE_PUBLIC_KEY: str = ''
+    STRIPE_SECRET_KEY: str = ''
+    STRIPE_WEBHOOK_SECRET: str = ''
 
     # File Upload Configuration
     UPLOAD_DIR: str = "uploads"
