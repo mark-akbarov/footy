@@ -20,6 +20,7 @@ from schemas.user import OutUserSchema
 from api.v1.authentication import get_current_active_user
 from core.config import settings
 
+
 router = APIRouter(
     prefix="/memberships",
     tags=["Memberships"],
