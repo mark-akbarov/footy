@@ -51,6 +51,7 @@ class GlobalSettings(BaseSettings):
     STRIPE_PUBLIC_KEY: str = ''
     STRIPE_SECRET_KEY: str = ''
     STRIPE_WEBHOOK_SECRET: str = ''
+    STRIPE_RETURN_URL: str = 'http://localhost:8000/api/v1/stripe/confirm'
 
     # File Upload Configuration
     UPLOAD_DIR: str = "uploads"

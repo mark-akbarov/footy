@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 
-stripe.api_key = settings.STRIPE_API_KEY
+stripe.api_key = settings.STRIPE_PUBLIC_KEY
 
 
 
@@ -50,8 +50,6 @@ async def get_checkout_items(price: int):
 async def create_stripe_checkout_session(
     items: list,
     customer_email: str,
-    ride_id: int,
-    ride_hash: Optional[str] = None,
 ) -> Session:
     ui_mode = 'embedded'
     mode = 'payment'
@@ -64,8 +62,6 @@ async def create_stripe_checkout_session(
         customer_email=customer_email,
         metadata={
             'environment': str(settings.ENVIRONMENT.value),
-            'ride_id': ride_id,
-            'ride_hash': ride_hash
         },
         payment_method_types=['card']
     )
