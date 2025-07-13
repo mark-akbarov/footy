@@ -12,12 +12,19 @@ asyncpg = "*"
 tenacity = "*"
 alembic = "*"
 sqlalchemy = {extras = ["asyncio"], version = "*"}
-psycopg2 = "*"
+psycopg2-binary = "*"
 redis = "*"
 twilio = "*"
 aiofiles = "*"
 aiosmtplib = "*"
 celery = "*"
+passlib = "*"
+python-multipart = "*"
+bcrypt = "==4.0.1"
+python-jose = {extras = ["cryptography"], version = "*"}
+sib-api-v3-sdk = "*"
+stripe = "*"
+asyncer = "==0.0.8"
 
 [dev-packages]
 factory-boy = "*"
@@ -26,4 +33,4 @@ ruff = "*"
 black = {extras = ["d"], version = "*"}
 
 [requires]
-python_version = "3.10"
+python_version = "3.13"

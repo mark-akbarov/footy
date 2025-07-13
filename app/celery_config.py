@@ -5,12 +5,15 @@ from celery import Celery
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-
 REDIS_URL = "redis://default:password@localhost:6377/0"
 
 BROKER_URL = settings.REDIS_URL
 
-celery_app = Celery("config")
+celery_app = Celery(
+    "worker",
+    backend=f"{BROKER_URL}",
+    broker=f"{BROKER_URL}"
+)
 
 celery_app.conf.update(
     task_serializer="json",
@@ -30,7 +33,7 @@ celery_app.conf.update(
     }
 )
 
-celery_app.conf.broker_url = "redis://default:password@localhost:6377"
+# celery_app.conf.broker_url = "redis://default:password@localhost:6377"
 
 celery_app.autodiscover_tasks(
     [

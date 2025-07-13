@@ -71,7 +71,11 @@ class BaseCrud(
         return [column(i) for i in self._out_schema.model_fields.keys()]
 
     async def create(self, in_schema: IN_SCHEMA) -> OUT_SCHEMA:
-        entry = self._table(**in_schema.model_dump())
+        # Handle both Pydantic models and dictionaries
+        if isinstance(in_schema, dict):
+            entry = self._table(**in_schema)
+        else:
+            entry = self._table(**in_schema.model_dump())
         self._db_session.add(entry)
         await self._db_session.flush()
         return self._out_schema.model_validate(entry)

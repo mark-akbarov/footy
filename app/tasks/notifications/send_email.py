@@ -4,10 +4,12 @@ from typing import Dict
 
 
 @celery_app.task(name="send_email_notification")
-def send_email_task(to: str, subject: str, template: str, context: Dict[str, str]):
-    send_mail(
-        mail_to=to,
-        mail_subject=subject,
-        mail_template_name=template,
-        mail_context=context
+def send_email_task(to_email: str, subject: str, template: str, context: Dict[str, str], to_name: str = None):
+    """Celery task to send an email."""
+    return send_mail(
+        to_email=to_email,
+        subject=subject,
+        template_name=template,
+        context=context,
+        to_name=to_name
     )

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Email Verification</title>
+</head>
+<body>
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2>Hello {{ first_name }}!</h2>
+    <p>Thank you for registering. Please use the following verification code to complete your registration:</p>
+    <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; margin: 20px 0;">
+        <strong>{{ verification_code }}</strong>
+    </div>
+    <p>This code will expire in 5 minutes.</p>
+    <p>If you didn't request this verification, please ignore this email.</p>
+    <p>Best regards,<br>Footy Team</p>
+</div>
+</body>
+</html>

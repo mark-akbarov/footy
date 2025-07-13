@@ -1,7 +1,8 @@
+import json
 import os
 from enum import Enum
 from functools import lru_cache
-from typing import Optional, Set
+from typing import Optional, Set, List
 
 from pydantic import AnyHttpUrl, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,31 +19,43 @@ class GlobalSettings(BaseSettings):
     PROJECT_NAME: str = "FastAPI Template"
     API_V1_STR: str = "/v1"
 
-    DOCS_USERNAME: str = "docs_user"
-    DOCS_PASSWORD: str = "simple_password"
+    DOCS_USERNAME: str = "admin"
+    DOCS_PASSWORD: str = "admin"
 
     TRUSTED_HOSTS: Set[str] = {"app", "localhost", "0.0.0.0", "127.0.0.1"}
-    BACKEND_CORS_ORIGINS: Set[AnyHttpUrl] = set()
+    BACKEND_CORS_ORIGINS: List[str] = []
 
     ENVIRONMENT: EnvironmentEnum
     DEBUG: bool = True
 
-    DATABASE_URL: Optional[PostgresDsn] = "postgresql://postgres:postgres@localhost:5434/db"
+    DATABASE_URL: Optional[PostgresDsn] = None
     DB_ECHO_LOG: bool = True
 
-    REDIS_URL: Optional[RedisDsn] = "redis://default:password@localhost:6377"
-    REDIS_TLS_URL: Optional[RedisDsn] = "redis://default:password@localhost:6377"
-    REDIS_CACHE_TTL: int = 300
-    
-    MAIL_USER: str = "mymail@gmail.com"
-    MAIL_PASSWORD: str = "mail_password"
-    MAIL_SMTP_SERVER: str = "smtp.gmail.com"
-    MAIL_SMTP_PORT: str = "587"
+    REDIS_URL: Optional[RedisDsn] = None
 
-    TWILIO_ACCOUNT_SID: str = "twilio_account_sid"
-    TWILIO_AUTH_TOKEN: str = "twilio_auth_token"
-    TWILIO_MESSAGING_SERVICE_SID: str = "twilio_message_service_id"
-    
+    BREVO_API_KEY: str
+    MAIL_SMTP_PORT: str
+    MAIL_FROM: str
+    MAIL_FROM_NAME: str
+
+    TWILIO_ACCOUNT_SID: str = ''
+    TWILIO_AUTH_TOKEN: str = ''
+    TWILIO_MESSAGING_SERVICE_SID: str = ''
+
+    # JWT Configuration
+    JWT_SECRET_KEY: str = ''
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # Stripe Configuration
+    STRIPE_PUBLIC_KEY: str = ''
+    STRIPE_SECRET_KEY: str = ''
+    STRIPE_WEBHOOK_SECRET: str = ''
+
+    # File Upload Configuration
+    UPLOAD_DIR: str = "uploads"
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+
     @property
     def async_database_url(self) -> Optional[str]:
         return (
@@ -51,7 +64,13 @@ class GlobalSettings(BaseSettings):
             else str(self.DATABASE_URL)
         )
 
-    model_config = SettingsConfigDict(case_sensitive=True)
+    @property
+    def cors_origins(self):
+        if isinstance(self.BACKEND_CORS_ORIGINS, str):
+            return json.loads(self.BACKEND_CORS_ORIGINS)
+        return self.BACKEND_CORS_ORIGINS
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True)
 
 
 class TestSettings(GlobalSettings):

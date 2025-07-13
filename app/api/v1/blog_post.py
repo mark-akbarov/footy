@@ -1,4 +1,3 @@
-from api.dependencies.database import DbSessionDep
 from api.dependencies.pagination import PaginationDep
 from fastapi import APIRouter, Response, status
 from schemas import blog_post as blog_post_schemas
