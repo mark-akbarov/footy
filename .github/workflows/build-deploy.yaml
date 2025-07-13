@@ -1,0 +1,33 @@
+name: footy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v2
+
+      - name: Clean up unused Docker containers and images
+        run: |
+          docker container prune -f
+          docker image prune -a -f
+
+      - name: Build and Deploy Docker Compose stack
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF" == "refs/heads/main" ]; then
+            docker compose -f docker-compose.yml up -d --build
+          else
+            echo "Branch not supported for deployment: $GITHUB_REF"
+            exit 1
+          fi
+
+      - name: Clean up Docker after deployment
+        run: |
+          docker container prune -f
+          docker image prune -a -f
