@@ -50,6 +50,8 @@ async def get_checkout_items(price: int):
 async def create_stripe_checkout_session(
     items: list,
     customer_email: str,
+    user_id: int = None,
+    plan_type: str = None,
 ) -> Session:
     ui_mode = 'embedded'
     mode = 'payment'
@@ -62,6 +64,8 @@ async def create_stripe_checkout_session(
         customer_email=customer_email,
         metadata={
             'environment': str(settings.ENVIRONMENT.value),
+            'plan_type': plan_type,
+            'user_id': user_id,
         },
         payment_method_types=['card']
     )
