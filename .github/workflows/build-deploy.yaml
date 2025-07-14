@@ -18,8 +18,10 @@ jobs:
           docker container prune -f || true
           docker image prune -a -f || true
 
-      - name: Create .env file from GitHub Secret
-        run: echo "${{ secrets.ENV_FILE }}" > .env
+      - name: Create app/.env file from GitHub Secret
+        run: |
+          mkdir -p app
+          echo "${{ secrets.ENV_FILE }}" > app/.env
 
       - name: Deploy Application
         shell: bash
