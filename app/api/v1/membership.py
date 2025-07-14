@@ -91,7 +91,12 @@ async def create_checkout_session(
             )
 
         items = await get_checkout_items(price=int(amount*100))
-        session = await create_stripe_checkout_session(items=items, customer_email=current_user.email)  
+        session = await create_stripe_checkout_session(
+            items=items, 
+            customer_email=current_user.email, 
+            user_id=current_user.id, 
+            plan_type=payment_data.plan_type
+        )  
         
         return {
             'checkout_session_id': session.id, 
@@ -119,7 +124,6 @@ async def get_checkout_session(
         'customer_email': session.customer_details.email,
         'payment_intent': session.payment_intent,
     }
-
 
 
 @router.post("/create-payment-intent")
@@ -375,7 +379,7 @@ async def stripe_webhook(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No signature header"
             )
-        
+
         # Verify webhook signature
         try:
             event = stripe.Webhook.construct_event(
@@ -416,13 +420,13 @@ async def handle_payment_success(payment_intent: dict, db: AsyncSession):
     
     user_id = int(payment_intent['metadata'].get('user_id'))
     plan_type = MembershipPlan(payment_intent['metadata'].get('plan_type'))
-    
+
     # Check if membership already exists
     existing_membership = await membership_crud.get_active_membership_by_user_id(user_id)
     if existing_membership:
         return  # Already processed
     
-    start_date = datetime.utcnow()
+    start_date = datetime.now()
     renewal_date = start_date + timedelta(days=30)
     
     membership_data = {
@@ -434,7 +438,7 @@ async def handle_payment_success(payment_intent: dict, db: AsyncSession):
         "renewal_date": renewal_date,
         "stripe_payment_intent_id": payment_intent['id']
     }
-    
+
     await membership_crud.create(membership_data)
     await user_crud.activate_user(user_id)
     await membership_crud.commit_session()
