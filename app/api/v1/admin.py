@@ -31,8 +31,8 @@ def require_admin_role(current_user: OutUserSchema = Depends(get_current_active_
 
 @router.get("/teams/pending", response_model=List[OutUserSchema])
 async def get_pending_teams(
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_admin_role)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_admin_role)
 ):
     """Get all teams pending approval."""
     user_crud = UsersCrud(db)
@@ -43,9 +43,9 @@ async def get_pending_teams(
 
 @router.post("/teams/{team_id}/approve", response_model=OutUserSchema)
 async def approve_team(
-        team_id: int,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_admin_role)
+    team_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_admin_role)
 ):
     """Approve a team."""
     user_crud = UsersCrud(db)
@@ -56,7 +56,6 @@ async def approve_team(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Team not found"
         )
-
     if team.role != UserRole.TEAM:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -64,15 +63,20 @@ async def approve_team(
         )
 
     approved_team = await user_crud.approve_team(team_id)
+    if not approved_team:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Team not found or could not be approved"
+        )
 
     return OutUserSchema.model_validate(approved_team)
 
 
 @router.get("/users", response_model=PaginatedUserSchema)
 async def get_all_users(
-        pagination: PaginationDep,
-        current_user: OutUserSchema = Depends(require_admin_role),
-        db: AsyncSession = Depends(get_db_session),
+    pagination: PaginationDep,
+    current_user: OutUserSchema = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db_session),
 ):
     """Get all users with pagination."""
     user_crud = UsersCrud(db)
@@ -89,9 +93,9 @@ async def get_all_users(
 
 @router.get("/users/{user_id}", response_model=OutUserSchema)
 async def get_user_by_id(
-        user_id: int,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_admin_role)
+    user_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_admin_role)
 ):
     """Get a specific user by ID."""
     user_crud = UsersCrud(db)
@@ -108,10 +112,10 @@ async def get_user_by_id(
 
 @router.patch("/users/{user_id}", response_model=OutUserSchema)
 async def update_user(
-        user_id: int,
-        user_data: UpdateUserSchema,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_admin_role)
+    user_id: int,
+    user_data: UpdateUserSchema,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_admin_role)
 ):
     """Update user information."""
     user_crud = UsersCrud(db)
@@ -131,46 +135,62 @@ async def update_user(
 
 @router.post("/users/{user_id}/activate", response_model=OutUserSchema)
 async def activate_user(
-        user_id: int,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_admin_role)
+    user_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_admin_role)
 ):
     """Activate a user account."""
     user_crud = UsersCrud(db)
 
-    user = await user_crud.activate_user(user_id)
+    # First check if the user exists
+    user = await user_crud.get_by_id(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
 
-    return OutUserSchema.model_validate(user)
+    activated_user = await user_crud.activate_user(user_id)
+    if not activated_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found or could not be activated"
+        )
+
+    return OutUserSchema.model_validate(activated_user)
 
 
 @router.post("/users/{user_id}/deactivate", response_model=OutUserSchema)
 async def deactivate_user(
-        user_id: int,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_admin_role)
+    user_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_admin_role)
 ):
     """Deactivate a user account."""
     user_crud = UsersCrud(db)
 
-    user = await user_crud.deactivate_user(user_id)
+    # First check if the user exists
+    user = await user_crud.get_by_id(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
 
-    return OutUserSchema.model_validate(user)
+    deactivated_user = await user_crud.deactivate_user(user_id)
+    if not deactivated_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found or could not be deactivated"
+        )
+
+    return OutUserSchema.model_validate(deactivated_user)
 
 
 @router.get("/revenue")
 async def get_revenue_stats(
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_admin_role)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_admin_role)
 ):
     """Get revenue statistics."""
     membership_crud = MembershipCrud(db)
@@ -189,8 +209,8 @@ async def get_revenue_stats(
 
 @router.get("/stats")
 async def get_platform_stats(
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_admin_role)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_admin_role)
 ):
     """Get platform statistics."""
     user_crud = UsersCrud(db)
@@ -214,9 +234,9 @@ async def get_platform_stats(
 
 @router.delete("/users/{user_id}")
 async def delete_user(
-        user_id: int,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_admin_role)
+    user_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_admin_role)
 ):
     """Delete a user account (use with caution)."""
     user_crud = UsersCrud(db)

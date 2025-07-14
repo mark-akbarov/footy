@@ -109,11 +109,12 @@ async def register_candidate(
     # Hash password
     hashed_password = get_password_hash(candidate_data.password)
 
-    # Create user data
+    # Create user data from the schema
     user_data = candidate_data.model_dump()
     user_data["hashed_password"] = hashed_password
-    user_data["role"] = UserRole.CANDIDATE
     del user_data["password"]
+
+    print("!!!!!! DEBUG: Data before creating user:", user_data)  # DEBUG STATEMENT
 
     # Create user
     user = await user_crud.create(user_data)
@@ -165,10 +166,9 @@ async def register_team(
 
     hashed_password = get_password_hash(team_data.password)
 
-    # Create user data
+    # Create user data from the schema
     user_data = team_data.model_dump()
     user_data["hashed_password"] = hashed_password
-    user_data["role"] = UserRole.TEAM
     del user_data["password"]
 
     # Debug hashed password
@@ -180,6 +180,7 @@ async def register_team(
             detail="Password hashing failed.",
         )
 
+    print("!!!!!! DEBUG: Data before creating team:", user_data) # DEBUG STATEMENT
     print(f"User data being inserted: {user_data}")
 
     # Create user

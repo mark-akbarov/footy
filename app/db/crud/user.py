@@ -2,7 +2,7 @@ from typing import Type, Optional, List
 
 from pydantic import EmailStr
 from sqlalchemy.sql.elements import UnaryExpression
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload
 
 from db.crud.base import BaseCrud
@@ -114,30 +114,45 @@ class UsersCrud(
 
     async def approve_team(self, team_id: int) -> Optional[UserTable]:
         """Approve a team."""
-        team = await self.get_by_id(team_id)
+        # Get the actual database object, not the Pydantic model
+        stmt = select(self._table).where(self._table.id == team_id)
+        result = await self._db_session.execute(stmt)
+        team = result.scalar_one_or_none()
+        
         if team and team.role == UserRole.TEAM:
             team.is_approved = True
             await self._db_session.commit()
             await self._db_session.refresh(team)
-        return team
+            return team
+        return None
 
     async def activate_user(self, user_id: int) -> Optional[UserTable]:
         """Activate a user."""
-        user = await self.get_by_id(user_id)
+        # Get the actual database object, not the Pydantic model
+        stmt = select(self._table).where(self._table.id == user_id)
+        result = await self._db_session.execute(stmt)
+        user = result.scalar_one_or_none()
+        
         if user:
             user.is_active = True
             await self._db_session.commit()
             await self._db_session.refresh(user)
-        return user
+            return user
+        return None
 
     async def deactivate_user(self, user_id: int) -> Optional[UserTable]:
         """Deactivate a user."""
-        user = await self.get_by_id(user_id)
+        # Get the actual database object, not the Pydantic model
+        stmt = select(self._table).where(self._table.id == user_id)
+        result = await self._db_session.execute(stmt)
+        user = result.scalar_one_or_none()
+        
         if user:
             user.is_active = False
             await self._db_session.commit()
             await self._db_session.refresh(user)
-        return user
+            return user
+        return None
 
     async def get_candidates_with_active_membership(self) -> List[UserTable]:
         """Get candidates with active membership."""
@@ -152,3 +167,13 @@ class UsersCrud(
         ).options(selectinload(UserTable.memberships))
         result = await self._db_session.execute(query)
         return result.scalars().all()
+
+    async def get_all(self, limit: int, offset: int):
+        stmt = select(UserTable).limit(limit).offset(offset)
+        result = await self._db_session.execute(stmt)
+        return result.scalars().all()
+
+    async def count(self):
+        stmt = select(func.count()).select_from(UserTable)
+        result = await self._db_session.execute(stmt)
+        return result.scalar_one()
