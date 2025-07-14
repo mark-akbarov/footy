@@ -53,6 +53,6 @@ RUN sed -i 's/\r$//' /usr/src/app/entrypoint.sh && \
 USER app
 
 ENTRYPOINT ["/bin/bash", "/usr/src/app/entrypoint.sh"]
-EXPOSE 8080
+EXPOSE 8000
 CMD [ "gunicorn", "main:app", "--workers", "8", "--worker-class", \
-     "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080" ]
+     "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000" ]
