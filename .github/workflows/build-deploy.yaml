@@ -22,7 +22,7 @@ jobs:
         run: |
           echo "Deploying application stack..."
           if [ "$GITHUB_REF" == "refs/heads/main" ]; then
-            docker compose -f docker-compose.yml up -d --build
+            docker-compose -f docker-compose.yml up -d --build
             echo "Deployment successful."
           else
             echo "ERROR: Deployment for branch $GITHUB_REF is not supported."
