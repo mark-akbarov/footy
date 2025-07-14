@@ -28,6 +28,14 @@ class GlobalSettings(BaseSettings):
     ENVIRONMENT: EnvironmentEnum
     DEBUG: bool = True
 
+    POSTGRES_SERVER: str
+    POSTGRES_PORT: int
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
+    POSTGRES_HOST_PORT: int | None = None
+    POSTGRES_CONTAINER_PORT: int | None = None
+
     DATABASE_URL: Optional[PostgresDsn] = None
     DB_ECHO_LOG: bool = True
 
