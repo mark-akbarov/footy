@@ -7,5 +7,7 @@ alembic upgrade head || {
   exit 1
 }
 
+mkdir -p /usr/src/app/uploads/cvs
+
 echo "Migrations complete. Starting the application..."
 exec "$@"  # Passes CMD from Dockerfile to execute it
