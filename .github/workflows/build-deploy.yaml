@@ -1,33 +1,36 @@
-name: footy
+name: Deploy Workflow
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  build:
+  deploy:
     runs-on: self-hosted
-
     steps:
-      - name: Checkout the code
+      - name: Checkout the repository
         uses: actions/checkout@v2
 
-      - name: Clean up unused Docker containers and images
+      - name: Docker cleanup (pre-deployment)
         run: |
-          docker container prune -f
-          docker image prune -a -f
+          echo "Pruning unused Docker containers and images (before deployment)..."
+          docker container prune -f || true
+          docker image prune -a -f || true
 
-      - name: Build and Deploy Docker Compose stack
+      - name: Deploy Application
         shell: bash
         run: |
+          echo "Deploying application stack..."
           if [ "$GITHUB_REF" == "refs/heads/main" ]; then
             docker compose -f docker-compose.yml up -d --build
+            echo "Deployment successful."
           else
-            echo "Branch not supported for deployment: $GITHUB_REF"
+            echo "ERROR: Deployment for branch $GITHUB_REF is not supported."
             exit 1
           fi
 
-      - name: Clean up Docker after deployment
+      - name: Docker cleanup (post-deployment)
         run: |
-          docker container prune -f
-          docker image prune -a -f
+          echo "Cleaning up unused Docker resources..."
+          docker container prune -f || true
+          docker image prune -a -f || true
