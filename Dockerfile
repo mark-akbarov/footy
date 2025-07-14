@@ -8,10 +8,10 @@ ENV PYTHONFAULTHANDLER 1
 
 FROM base as builder
 
-# install dependencies
-RUN apt-get update
-RUN apt-get install -y gcc musl-dev libpq-dev libffi-dev zlib1g-dev g++ libev-dev git build-essential \
-    libev4 ca-certificates mailcap debian-keyring debian-archive-keyring apt-transport-https
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc musl-dev libpq-dev libffi-dev zlib1g-dev g++ libev-dev git build-essential \
+    ca-certificates mailcap debian-keyring debian-archive-keyring apt-transport-https
 
 RUN pip3 install -U pip
 RUN pip3 install pipenv=="2023.4.20"
@@ -39,7 +39,14 @@ RUN chown -R app:app /usr/src/app/
 
 USER app
 
-EXPOSE 8080
-#ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
-#CMD [ "gunicorn", "main:app", "--workers", "8", "--worker-class", \
-#		"uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080" ]
+# Install the required netcat with apt-get
+RUN apt-get update && apt-get install -y --no-install-recommends netcat-openbsd
+
+COPY app/entrypoint.sh /usr/src/app/entrypoint.sh
+RUN chmod +x /usr/src/app/entrypoint.sh
+
+ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
+
+EXPOSE 8000
+CMD [ "gunicorn", "main:app", "--workers", "8", "--worker-class", \
+		"uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080" ]

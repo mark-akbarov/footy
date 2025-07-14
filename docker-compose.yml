@@ -7,7 +7,6 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./app:/usr/src/app
-    command: [ "/bin/sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload" ]
     ports:
       - "8000:8000"
     environment:
@@ -17,7 +16,8 @@ services:
         condition: service_healthy
     networks:
       - app-network
-
+    env_file:
+      - .env
 
   postgres_db:
     image: bitnami/postgresql:latest
@@ -32,12 +32,13 @@ services:
       retries: 5
     networks:
       - app-network
+
   redis:
     image: bitnami/redis:7.0
     environment:
       - ALLOW_EMPTY_PASSWORD=yes  # For development only
     ports:
-      - "6379:6379"  # Changed from 6377 to standard Redis port
+      - "6379:6379"
     networks:
       - app-network
     healthcheck:
@@ -45,6 +46,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
   worker:
     build:
       context: .
@@ -56,6 +58,7 @@ services:
       - redis
     networks:
       - app-network
+
 networks:
   app-network:
     driver: bridge

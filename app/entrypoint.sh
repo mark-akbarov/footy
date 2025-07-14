@@ -1,8 +1,11 @@
 #!/bin/bash
+set -e  # Exit immediately if any command fails
 
-set -e
+echo "Starting migrations..."
+alembic upgrade head || {
+  echo "Migration failed. Exiting."
+  exit 1
+}
 
-# Let the DB start
-python3 backend_pre_start.py
-
-exec "$@"
+echo "Migrations complete. Starting the application..."
+exec "$@"  # Passes CMD from Dockerfile to execute it

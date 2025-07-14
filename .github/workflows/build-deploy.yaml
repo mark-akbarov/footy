@@ -2,11 +2,12 @@ name: Deploy Workflow
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
   deploy:
     runs-on: self-hosted
+
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v2
@@ -16,6 +17,9 @@ jobs:
           echo "Pruning unused Docker containers and images (before deployment)..."
           docker container prune -f || true
           docker image prune -a -f || true
+
+      - name: Create .env file from GitHub Secret
+        run: echo "${{ secrets.ENV_FILE }}" > .env
 
       - name: Deploy Application
         shell: bash
