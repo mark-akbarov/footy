@@ -37,8 +37,6 @@ RUN	chown -R app:app /home/app
 COPY ./app /usr/src/app/
 RUN chown -R app:app /usr/src/app/
 
-USER app
-
 # Install the required netcat with apt-get
 RUN apt-get update && apt-get install -y --no-install-recommends netcat-openbsd
 
