@@ -23,7 +23,7 @@ class GlobalSettings(BaseSettings):
     DOCS_PASSWORD: str = "admin"
 
     TRUSTED_HOSTS: Set[str] = {"app", "localhost", "0.0.0.0", "127.0.0.1"}
-    BACKEND_CORS_ORIGINS: List[str] = []
+    # BACKEND_CORS_ORIGINS: List[str] = []
 
     ENVIRONMENT: EnvironmentEnum
     DEBUG: bool = True
@@ -73,11 +73,11 @@ class GlobalSettings(BaseSettings):
             else str(self.DATABASE_URL)
         )
 
-    @property
-    def cors_origins(self):
-        if isinstance(self.BACKEND_CORS_ORIGINS, str):
-            return json.loads(self.BACKEND_CORS_ORIGINS)
-        return self.BACKEND_CORS_ORIGINS
+    # @property
+    # def cors_origins(self):
+    #     if isinstance(self.BACKEND_CORS_ORIGINS, str):
+    #         return json.loads(self.BACKEND_CORS_ORIGINS)
+    #     return self.BACKEND_CORS_ORIGINS
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True)
 
