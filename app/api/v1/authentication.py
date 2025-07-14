@@ -61,8 +61,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 async def get_current_user(
-        token: str = Depends(oauth2_scheme),
-        db: AsyncSession = Depends(get_db_session)
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db_session)
 ) -> OutUserSchema:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -92,8 +92,8 @@ async def get_current_active_user(current_user: OutUserSchema = Depends(get_curr
 
 @router.post("/register-candidate", response_model=OutUserSchema, status_code=status.HTTP_201_CREATED)
 async def register_candidate(
-        candidate_data: CandidateRegistrationSchema,
-        db: AsyncSession = Depends(get_db_session)
+    candidate_data: CandidateRegistrationSchema,
+    db: AsyncSession = Depends(get_db_session)
 ):
     """Register a new candidate."""
     user_crud = UsersCrud(db)
@@ -109,11 +109,12 @@ async def register_candidate(
     # Hash password
     hashed_password = get_password_hash(candidate_data.password)
 
-    # Create user data
+    # Create user data from the schema
     user_data = candidate_data.model_dump()
     user_data["hashed_password"] = hashed_password
-    user_data["role"] = UserRole.CANDIDATE
     del user_data["password"]
+
+    print("!!!!!! DEBUG: Data before creating user:", user_data)  # DEBUG STATEMENT
 
     # Create user
     user = await user_crud.create(user_data)
@@ -139,8 +140,9 @@ async def register_candidate(
 
 @router.post("/register-team", response_model=OutUserSchema, status_code=status.HTTP_201_CREATED)
 async def register_team(
-        team_data: TeamRegistrationSchema,
-        db: AsyncSession = Depends(get_db_session)):
+    team_data: TeamRegistrationSchema,
+    db: AsyncSession = Depends(get_db_session),
+):
     """Register a new team."""
     user_crud = UsersCrud(db)
 
@@ -149,21 +151,40 @@ async def register_team(
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail="Email already registered",
         )
 
-    # Hash password
+    # Ensure password is provided
+    if not team_data.password or team_data.password.strip() == "":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is required",
+        )
+
+    # Debug password before hashing
+    print(f"Original password: {team_data.password}")
+
     hashed_password = get_password_hash(team_data.password)
 
-    # Create user data
-    user_data = team_data.model_copy(update={
-        "hashed_password": hashed_password,
-        "role": UserRole.TEAM
-    })
-    user_dict = user_data.model_dump(exclude={"password"})
+    # Create user data from the schema
+    user_data = team_data.model_dump()
+    user_data["hashed_password"] = hashed_password
+    del user_data["password"]
+
+    # Debug hashed password
+    print(f"Hashed password: {hashed_password}")
+
+    if not hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Password hashing failed.",
+        )
+
+    print("!!!!!! DEBUG: Data before creating team:", user_data) # DEBUG STATEMENT
+    print(f"User data being inserted: {user_data}")
 
     # Create user
-    user = await user_crud.create(user_dict)
+    user = await user_crud.create(user_data)
     await user_crud.commit_session()
 
     # Send email verification
@@ -177,8 +198,8 @@ async def register_team(
         template="verification",
         context={
             "first_name": user.first_name,
-            "verification_code": verification_code
-        }
+            "verification_code": verification_code,
+        },
     )
 
     return OutUserSchema.model_validate(user)
@@ -186,8 +207,8 @@ async def register_team(
 
 @router.post("/login", response_model=Token)
 async def login(
-        form_data: OAuth2PasswordRequestForm = Depends(),
-        db: AsyncSession = Depends(get_db_session)):
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db_session)):
     """Login user with email and password."""
     user_crud = UsersCrud(db)
     user = await user_crud.get_by_email(form_data.username)
@@ -237,9 +258,9 @@ def generate_verification_code() -> str:
 
 @router.post("/verify-email")
 async def verify_email(
-        email: str,
-        code: int,
-        db: AsyncSession = Depends(get_db_session)
+    email: str,
+    code: int,
+    db: AsyncSession = Depends(get_db_session)
 ):
     """Verify email code and activate user."""
     user_crud = UsersCrud(db)

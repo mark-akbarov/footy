@@ -1,0 +1,42 @@
+name: Deploy Workflow
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+
+      - name: Docker cleanup (pre-deployment)
+        run: |
+          echo "Pruning unused Docker containers and images (before deployment)..."
+          docker container prune -f || true
+          docker image prune -a -f || true
+
+      - name: Create app/.env file from GitHub Secret
+        run: |
+          mkdir -p app
+          echo "${{ secrets.ENV_FILE }}" > app/.env
+
+      - name: Deploy Application
+        shell: bash
+        run: |
+          echo "Deploying application stack..."
+          if [ "$GITHUB_REF" == "refs/heads/main" ]; then
+            docker-compose -f docker-compose.yml up -d --build
+            echo "Deployment successful."
+          else
+            echo "ERROR: Deployment for branch $GITHUB_REF is not supported."
+            exit 1
+          fi
+
+      - name: Docker cleanup (post-deployment)
+        run: |
+          echo "Cleaning up unused Docker resources..."
+          docker container prune -f || true
+          docker image prune -a -f || true

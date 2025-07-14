@@ -1,5 +1,3 @@
-version: "3"
-
 services:
   app:
     build:
@@ -7,37 +5,42 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./app:/usr/src/app
-    command: [ "/bin/sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload" ]
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://user:pass@postgres_db:5432/my_db
     depends_on:
-      postgres_db:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - app-network
+    env_file:
+      - app/.env
 
-
-  postgres_db:
-    image: bitnami/postgresql:latest
-    environment:
-      - POSTGRESQL_USERNAME=user
-      - POSTGRESQL_PASSWORD=pass
-      - POSTGRESQL_DATABASE=my_db
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    restart: always
+    env_file:
+      - app/.env
+    ports:
+      - "5444:5432"  # Host:Container (connect using 5444 from host)
     healthcheck:
-      test: [ "CMD", "pg_isready", "-U", "user" ]
-      interval: 10s
-      timeout: 5s
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
+      interval: 5s
       retries: 5
+      timeout: 3s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - app-network
+
   redis:
     image: bitnami/redis:7.0
     environment:
       - ALLOW_EMPTY_PASSWORD=yes  # For development only
     ports:
-      - "6379:6379"  # Changed from 6377 to standard Redis port
+      - "6379:6379"
     networks:
       - app-network
     healthcheck:
@@ -45,6 +48,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
   worker:
     build:
       context: .
@@ -53,9 +57,18 @@ services:
     volumes:
       - ./app:/usr/src/app
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - app-network
+    env_file:
+      - app/.env
+
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  postgres_data:

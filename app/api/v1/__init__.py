@@ -9,6 +9,7 @@ from .membership import router as membership_router
 from .messaging import router as messaging_router
 from .admin import router as admin_router
 from .candidates import router as candidates_router
+from .payment import router as payment_router
 
 api_router = APIRouter(prefix=settings.API_V1_STR)
 # api_router.include_router(blog_post_router)
@@ -16,6 +17,7 @@ api_router.include_router(auth_router)
 api_router.include_router(vacancy_router)
 api_router.include_router(application_router)
 api_router.include_router(membership_router)
+api_router.include_router(payment_router)
 api_router.include_router(messaging_router)
 api_router.include_router(admin_router)
 api_router.include_router(candidates_router)

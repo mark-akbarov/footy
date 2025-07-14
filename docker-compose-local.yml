@@ -9,7 +9,7 @@ services:
       - ./app:/usr/src/app
     command: [ "/bin/sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload" ]
     ports:
-      - "8000:8080"
+      - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://user:pass@postgres_db:5432/my_db
     depends_on:
