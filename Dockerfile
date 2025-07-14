@@ -40,14 +40,19 @@ RUN groupadd -g 1000 app && \
 
 RUN mkdir "/home/app" && chown -R app:app /home/app
 
-# Copy application code with proper ownership and permissions
-COPY --chown=app:app ./app /usr/src/app/
-COPY --chown=app:app --chmod=755 app/entrypoint.sh /usr/src/app/entrypoint.sh
+# Copy application code and entrypoint script
+COPY ./app /usr/src/app/
+COPY app/entrypoint.sh /usr/src/app/entrypoint.sh
+
+# Fix line endings, set permissions, and ownership
+RUN sed -i 's/\r$//' /usr/src/app/entrypoint.sh && \
+    chmod +x /usr/src/app/entrypoint.sh && \
+    chown -R app:app /usr/src/app/
 
 # Switch to non-root user
 USER app
 
-ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/usr/src/app/entrypoint.sh"]
 EXPOSE 8080
 CMD [ "gunicorn", "main:app", "--workers", "8", "--worker-class", \
      "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080" ]
