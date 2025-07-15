@@ -8,6 +8,7 @@ alembic upgrade head || {
 }
 
 # Fix permissions and create directory
+mkdir -p /usr/src/app/uploads/cvs
 chmod -R 775 /usr/src/app/uploads
 
 echo "Migrations complete. Starting the application..."
