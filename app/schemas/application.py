@@ -1,6 +1,8 @@
 from typing import Optional
 from datetime import datetime
 
+from pydantic import field_validator
+
 from schemas.base import BaseSchema, BasePaginatedSchema
 from db.tables.application import ApplicationStatus
 
@@ -28,10 +30,16 @@ class OutApplicationSchema(ApplicationSchemaBase):
     created_at: datetime
     updated_at: datetime
 
+    @field_validator("status", mode="before")
+    def normalize_role(cls, v):
+        if isinstance(v, str):
+            return v.lower()
+        return v
+
 
 class PaginatedApplicationSchema(BasePaginatedSchema[OutApplicationSchema]):
     items: list[OutApplicationSchema]
 
 
 class ApplicationStatusUpdateSchema(BaseSchema):
-    status: ApplicationStatus 
+    status: ApplicationStatus
