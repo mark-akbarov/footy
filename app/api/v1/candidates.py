@@ -42,13 +42,13 @@ def require_team_role(current_user: OutUserSchema = Depends(get_current_active_u
 
 @router.get("", response_model=PaginatedUserSchema)
 async def search_candidates(
-        pagination: PaginationDep,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_team_role),
-        role: Optional[str] = Query(None, description="Filter by role/position"),
-        location: Optional[str] = Query(None, description="Filter by location"),
-        experience_level: Optional[str] = Query(None, description="Filter by experience level"),
-        position: Optional[str] = Query(None, description="Filter by position")
+    pagination: PaginationDep,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_team_role),
+    role: Optional[str] = Query(None, description="Filter by role/position"),
+    location: Optional[str] = Query(None, description="Filter by location"),
+    experience_level: Optional[str] = Query(None, description="Filter by experience level"),
+    position: Optional[str] = Query(None, description="Filter by position")
 ):
     """Search and browse candidates."""
     user_crud = UsersCrud(db)
@@ -80,8 +80,8 @@ async def search_candidates(
 
 @router.get("/with-memberships", response_model=List[OutUserSchema])
 async def get_candidates_with_active_memberships(
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_team_role)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_team_role)
 ):
     """Get candidates with active memberships (premium feature)."""
     user_crud = UsersCrud(db)
@@ -92,9 +92,9 @@ async def get_candidates_with_active_memberships(
 
 @router.get("/{candidate_id}", response_model=OutUserSchema)
 async def get_candidate_profile(
-        candidate_id: int,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_team_role)
+    candidate_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_team_role)
 ):
     """Get detailed candidate profile."""
     user_crud = UsersCrud(db)
@@ -123,9 +123,9 @@ async def get_candidate_profile(
 
 @router.get("/{candidate_id}/cv")
 async def get_candidate_cv(
-        candidate_id: int,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_team_role)
+    candidate_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_team_role)
 ):
     """Get candidate CV file (if uploaded)."""
     user_crud = UsersCrud(db)
@@ -159,10 +159,10 @@ async def get_candidate_cv(
 
 @router.get("/search/by-position/{position_name}", response_model=List[OutUserSchema])
 async def search_candidates_by_position(
-        position_name: str,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_team_role),
-        limit: int = Query(20, le=100)
+    position_name: str,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_team_role),
+    limit: int = Query(20, le=100)
 ):
     """Search candidates by specific position."""
     user_crud = UsersCrud(db)
@@ -175,9 +175,9 @@ async def search_candidates_by_position(
 
 @router.get("/featured", response_model=List[OutUserSchema])
 async def get_featured_candidates(
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_team_role),
-        limit: int = Query(10, le=20)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_team_role),
+    limit: int = Query(10, le=20)
 ):
     """Get featured candidates (with premium memberships)."""
     user_crud = UsersCrud(db)
@@ -200,14 +200,14 @@ def require_candidate_role(current_user: OutUserSchema = Depends(get_current_act
 
 @router.post("/upload-cv")
 async def upload_cv(
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_candidate_role),
-        file: UploadFile = File(...)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_candidate_role),
+    file: UploadFile = File(...)
 ):
     """Upload CV file for the current candidate."""
     from db.crud.membership import MembershipCrud
     from db.tables.membership import MembershipStatus
-    
+
     user_crud = UsersCrud(db)
     membership_crud = MembershipCrud(db)
 
@@ -219,6 +219,7 @@ async def upload_cv(
             detail="Active membership required to upload CV. Please purchase a membership first."
         )
 
+    # Validate file upload
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -234,7 +235,7 @@ async def upload_cv(
             detail="Only PDF, DOC, and DOCX files are allowed"
         )
 
-    # Validate file size
+    # Read and validate file size
     content = await file.read()
     if len(content) > settings.MAX_FILE_SIZE:
         raise HTTPException(
@@ -242,9 +243,30 @@ async def upload_cv(
             detail=f"File size exceeds maximum limit of {settings.MAX_FILE_SIZE // (1024 * 1024)}MB"
         )
 
-    # Create upload directory if it doesn't exist
+    # Create upload directory - use absolute path
     upload_dir = os.path.join(settings.UPLOAD_DIR, "cvs")
-    os.makedirs(upload_dir, exist_ok=True)
+
+    # Ensure we have an absolute path
+    if not os.path.isabs(upload_dir):
+        upload_dir = os.path.join(os.getcwd(), upload_dir)
+
+    # Create directory with proper error handling
+    try:
+        os.makedirs(upload_dir, exist_ok=True)
+    except PermissionError as e:
+        # Log the error for debugging
+        print(f"Permission error creating directory {upload_dir}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server configuration error: Unable to create upload directory"
+        )
+    except Exception as e:
+        # Handle other potential errors
+        print(f"Unexpected error creating directory {upload_dir}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server error: Unable to create upload directory"
+        )
 
     # Get current user to check for existing CV
     user = await user_crud.get_by_id(current_user.id)
@@ -258,34 +280,199 @@ async def upload_cv(
     if user.cv_file_path and os.path.exists(user.cv_file_path):
         try:
             os.remove(user.cv_file_path)
-        except OSError:
-            pass  # Ignore errors if file doesn't exist
+            print(f"Removed old CV file: {user.cv_file_path}")
+        except OSError as e:
+            # Log the error but don't fail the upload
+            print(f"Warning: Could not remove old CV file {user.cv_file_path}: {e}")
 
     # Generate a unique filename
     filename = f"{current_user.id}_{uuid.uuid4()}{file_extension}"
     file_path = os.path.join(upload_dir, filename)
 
     # Save the file
-    with open(file_path, "wb") as f:
-        f.write(content)
+    try:
+        with open(file_path, "wb") as f:
+            f.write(content)
+        print(f"Successfully saved CV file to: {file_path}")
+    except Exception as e:
+        print(f"Error saving file {file_path}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error saving uploaded file"
+        )
 
-    # Update the candidate's CV file path
-    user.cv_file_path = file_path
-    await user_crud.commit_session()
+    # Update the candidate's CV file path in database
+    try:
+        user.cv_file_path = file_path
+        await user_crud.commit_session()
+        print(f"Updated user CV path in database: {file_path}")
+    except Exception as e:
+        # If database update fails, try to remove the uploaded file
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+
+        print(f"Error updating user CV path in database: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error updating user profile"
+        )
 
     return {
         "message": "CV file uploaded successfully",
         "filename": filename,
         "file_size": len(content),
+        "file_path": file_path,
         "download_url": f"/api/v1/candidates/download-cv/{current_user.id}"
     }
 
 
+@router.get("/download-cv/{user_id}")
+async def download_cv(
+    user_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_candidate_role)
+):
+    """Download CV file for a user."""
+    from fastapi.responses import FileResponse
+
+    user_crud = UsersCrud(db)
+
+    # Check if user exists and has CV
+    user = await user_crud.get_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Check if user has CV file
+    if not user.cv_file_path or not os.path.exists(user.cv_file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="CV file not found"
+        )
+
+    # Only allow users to download their own CV (or add admin check if needed)
+    if current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only download your own CV"
+        )
+
+    # Get original filename from the stored path
+    original_filename = f"cv_{user_id}{os.path.splitext(user.cv_file_path)[1]}"
+
+    return FileResponse(
+        path=user.cv_file_path,
+        filename=original_filename,
+        media_type="application/octet-stream"
+    )
+
+
+@router.delete("/delete-cv")
+async def delete_cv(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_candidate_role)
+):
+    """Delete CV file for the current candidate."""
+    user_crud = UsersCrud(db)
+
+    # Get current user
+    user = await user_crud.get_by_id(current_user.id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Check if user has CV file
+    if not user.cv_file_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No CV file found"
+        )
+
+    # Remove file from filesystem
+    if os.path.exists(user.cv_file_path):
+        try:
+            os.remove(user.cv_file_path)
+            print(f"Deleted CV file: {user.cv_file_path}")
+        except OSError as e:
+            print(f"Error deleting CV file {user.cv_file_path}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error deleting CV file"
+            )
+
+    # Update database
+    try:
+        user.cv_file_path = None
+        await user_crud.commit_session()
+        print(f"Removed CV path from user {current_user.id} database record")
+    except Exception as e:
+        print(f"Error updating user CV path in database: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error updating user profile"
+        )
+
+    return {
+        "message": "CV file deleted successfully"
+    }
+
+
+@router.get("/cv-info")
+async def get_cv_info(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_candidate_role)
+):
+    """Get CV file information for the current candidate."""
+    user_crud = UsersCrud(db)
+
+    # Get current user
+    user = await user_crud.get_by_id(current_user.id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Check if user has CV file
+    if not user.cv_file_path or not os.path.exists(user.cv_file_path):
+        return {
+            "has_cv": False,
+            "message": "No CV file found"
+        }
+
+    # Get file info
+    try:
+        file_stat = os.stat(user.cv_file_path)
+        filename = os.path.basename(user.cv_file_path)
+        file_extension = os.path.splitext(filename)[1]
+
+        return {
+            "has_cv": True,
+            "filename": filename,
+            "file_size": file_stat.st_size,
+            "file_extension": file_extension,
+            "upload_date": file_stat.st_mtime,
+            "download_url": f"/api/v1/candidates/download-cv/{current_user.id}"
+        }
+    except Exception as e:
+        print(f"Error getting CV file info: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving CV file information"
+        )
+
+
 @router.get("/download-cv/{candidate_id}")
 async def download_cv(
-        candidate_id: int,
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_team_role)
+    candidate_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_team_role)
 ):
     """Download a candidate's CV file."""
     user_crud = UsersCrud(db)
@@ -319,8 +506,8 @@ async def download_cv(
 
 @router.get("/my-cv")
 async def get_my_cv(
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_candidate_role)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_candidate_role)
 ):
     """Get current candidate's CV information."""
     user_crud = UsersCrud(db)
@@ -342,8 +529,8 @@ async def get_my_cv(
 
 @router.delete("/my-cv")
 async def delete_my_cv(
-        db: AsyncSession = Depends(get_db_session),
-        current_user: OutUserSchema = Depends(require_candidate_role)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_candidate_role)
 ):
     """Delete current candidate's CV file."""
     user_crud = UsersCrud(db)

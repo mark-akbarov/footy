@@ -49,6 +49,11 @@ RUN sed -i 's/\r$//' /usr/src/app/entrypoint.sh && \
     chmod +x /usr/src/app/entrypoint.sh && \
     chown -R app:app /usr/src/app/
 
+# Create uploads directory with proper permissions
+RUN mkdir -p /usr/src/app/uploads/cvs && \
+    chown -R app:app /usr/src/app/uploads && \
+    chmod -R 775 /usr/src/app/uploads
+
 # Switch to non-root user
 USER app
 
