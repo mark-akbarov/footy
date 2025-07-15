@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e  # Exit immediately if any command fails
+set -e
 
 echo "Starting migrations..."
 alembic upgrade head || {
@@ -7,7 +7,9 @@ alembic upgrade head || {
   exit 1
 }
 
+# Fix permissions and create directory
 mkdir -p /usr/src/app/uploads/cvs
+chmod -R 775 /usr/src/app/uploads
 
 echo "Migrations complete. Starting the application..."
-exec "$@"  # Passes CMD from Dockerfile to execute it
+exec "$@"
