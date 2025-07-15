@@ -23,16 +23,16 @@ class GlobalSettings(BaseSettings):
     DOCS_PASSWORD: str = "admin"
 
     TRUSTED_HOSTS: Set[str] = {"app", "localhost", "0.0.0.0", "127.0.0.1"}
-    # BACKEND_CORS_ORIGINS: List[str] = []
+    BACKEND_CORS_ORIGINS: List[str] = ["*"]
 
     ENVIRONMENT: EnvironmentEnum
     DEBUG: bool = True
 
-    POSTGRES_SERVER: str
-    POSTGRES_PORT: int
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
+    POSTGRES_SERVER: str = ''
+    POSTGRES_PORT: int = 5432
+    POSTGRES_USER: str = 'postgres'
+    POSTGRES_PASSWORD: str = 'postgres'
+    POSTGRES_DB: str = 'postgres'
     POSTGRES_HOST_PORT: int | None = None
     POSTGRES_CONTAINER_PORT: int | None = None
 
