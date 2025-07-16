@@ -25,6 +25,7 @@ python-jose = {extras = ["cryptography"], version = "*"}
 sib-api-v3-sdk = "*"
 stripe = "*"
 asyncer = "==0.0.8"
+boto3 = "*"
 
 [dev-packages]
 factory-boy = "*"

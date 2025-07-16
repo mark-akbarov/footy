@@ -204,9 +204,10 @@ async def upload_cv(
     current_user: OutUserSchema = Depends(require_candidate_role),
     file: UploadFile = File(...)
 ):
-    """Upload CV file for the current candidate."""
+    """Upload CV file for the current candidate (S3 version)."""
     from db.crud.membership import MembershipCrud
     from db.tables.membership import MembershipStatus
+    from utils.s3 import upload_file_to_s3, delete_file_from_s3, generate_presigned_url
 
     user_crud = UsersCrud(db)
     membership_crud = MembershipCrud(db)
@@ -243,32 +244,7 @@ async def upload_cv(
             detail=f"File size exceeds maximum limit of {settings.MAX_FILE_SIZE // (1024 * 1024)}MB"
         )
 
-    # Create upload directory - use absolute path
-    upload_dir = os.path.join(settings.UPLOAD_DIR, "cvs")
-
-    # Ensure we have an absolute path
-    if not os.path.isabs(upload_dir):
-        upload_dir = os.path.join(os.getcwd(), upload_dir)
-
-    # Create directory with proper error handling
-    try:
-        os.makedirs(upload_dir, exist_ok=True)
-    except PermissionError as e:
-        # Log the error for debugging
-        print(f"Permission error creating directory {upload_dir}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Server configuration error: Unable to create upload directory"
-        )
-    except Exception as e:
-        # Handle other potential errors
-        print(f"Unexpected error creating directory {upload_dir}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Server error: Unable to create upload directory"
-        )
-
-    # Get current user to check for existing CV
+    # Get user
     user = await user_crud.get_by_id(current_user.id)
     if not user:
         raise HTTPException(
@@ -276,55 +252,33 @@ async def upload_cv(
             detail="User not found"
         )
 
-    # Remove old CV file if it exists
-    if user.cv_file_path and os.path.exists(user.cv_file_path):
+    # Remove old CV from S3 if exists
+    if user.cv_file_path:
         try:
-            os.remove(user.cv_file_path)
-            print(f"Removed old CV file: {user.cv_file_path}")
-        except OSError as e:
-            # Log the error but don't fail the upload
-            print(f"Warning: Could not remove old CV file {user.cv_file_path}: {e}")
+            delete_file_from_s3(user.cv_file_path)
+        except Exception as e:
+            print(f"Warning: failed to delete old CV from S3: {e}")
 
-    # Generate a unique filename
-    filename = f"{current_user.id}_{uuid.uuid4()}{file_extension}"
-    file_path = os.path.join(upload_dir, filename)
-
-    # Save the file
+    # Upload new CV
     try:
-        with open(file_path, "wb") as f:
-            f.write(content)
-        print(f"Successfully saved CV file to: {file_path}")
-    except Exception as e:
-        print(f"Error saving file {file_path}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error saving uploaded file"
-        )
-
-    # Update the candidate's CV file path in database
-    try:
-        user.cv_file_path = file_path
+        s3_key = upload_file_to_s3(content, file.filename, file.content_type)
+        user.cv_file_path = s3_key
         await user_crud.commit_session()
-        print(f"Updated user CV path in database: {file_path}")
     except Exception as e:
-        # If database update fails, try to remove the uploaded file
-        try:
-            os.remove(file_path)
-        except OSError:
-            pass
-
-        print(f"Error updating user CV path in database: {e}")
+        print(f"Error uploading to S3 or updating DB: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error updating user profile"
+            detail="Error uploading file"
         )
+
+    download_url = generate_presigned_url(s3_key)
 
     return {
         "message": "CV file uploaded successfully",
-        "filename": filename,
+        "filename": file.filename,
         "file_size": len(content),
-        "file_path": file_path,
-        "download_url": f"/api/v1/candidates/download-cv/{current_user.id}"
+        "file_path": s3_key,
+        "download_url": download_url
     }
 
 
@@ -334,41 +288,34 @@ async def download_cv(
     db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_candidate_role)
 ):
-    """Download CV file for a user."""
-    from fastapi.responses import FileResponse
+    """Generate a presigned URL to download the CV from S3."""
+    from utils.s3 import generate_presigned_url
 
     user_crud = UsersCrud(db)
 
-    # Check if user exists and has CV
+    # Get user
     user = await user_crud.get_by_id(user_id)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+        raise HTTPException(status_code=404, detail="User not found")
 
-    # Check if user has CV file
-    if not user.cv_file_path or not os.path.exists(user.cv_file_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="CV file not found"
-        )
-
-    # Only allow users to download their own CV (or add admin check if needed)
+    # Only allow user to access their own CV
     if current_user.id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only download your own CV"
-        )
+        raise HTTPException(status_code=403, detail="You can only download your own CV")
 
-    # Get original filename from the stored path
-    original_filename = f"cv_{user_id}{os.path.splitext(user.cv_file_path)[1]}"
+    # Check CV exists
+    if not user.cv_file_path:
+        raise HTTPException(status_code=404, detail="CV file not found")
 
-    return FileResponse(
-        path=user.cv_file_path,
-        filename=original_filename,
-        media_type="application/octet-stream"
-    )
+    try:
+        presigned_url = generate_presigned_url(user.cv_file_path)
+    except Exception as e:
+        print(f"Failed to generate S3 download link: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate download URL")
+
+    return {
+        "message": "Presigned download link generated",
+        "url": presigned_url
+    }
 
 
 @router.delete("/delete-cv")
@@ -376,51 +323,37 @@ async def delete_cv(
     db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_candidate_role)
 ):
-    """Delete CV file for the current candidate."""
+    """Delete CV file from S3 for the current candidate."""
+    from utils.s3 import delete_file_from_s3
+
     user_crud = UsersCrud(db)
 
-    # Get current user
+    # Get user
     user = await user_crud.get_by_id(current_user.id)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+        raise HTTPException(status_code=404, detail="User not found")
 
-    # Check if user has CV file
+    # Check if CV exists
     if not user.cv_file_path:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No CV file found"
-        )
+        raise HTTPException(status_code=404, detail="No CV file found")
 
-    # Remove file from filesystem
-    if os.path.exists(user.cv_file_path):
-        try:
-            os.remove(user.cv_file_path)
-            print(f"Deleted CV file: {user.cv_file_path}")
-        except OSError as e:
-            print(f"Error deleting CV file {user.cv_file_path}: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Error deleting CV file"
-            )
+    # Attempt to delete from S3
+    try:
+        delete_file_from_s3(user.cv_file_path)
+        print(f"Deleted CV from S3: {user.cv_file_path}")
+    except Exception as e:
+        print(f"Error deleting from S3: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete CV from storage")
 
-    # Update database
+    # Clear path from DB
     try:
         user.cv_file_path = None
         await user_crud.commit_session()
-        print(f"Removed CV path from user {current_user.id} database record")
+        print(f"Removed CV path from DB for user {current_user.id}")
     except Exception as e:
-        print(f"Error updating user CV path in database: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error updating user profile"
-        )
+        raise HTTPException(status_code=500, detail="Failed to update user profile")
 
-    return {
-        "message": "CV file deleted successfully"
-    }
+    return {"message": "CV file deleted successfully"}
 
 
 @router.get("/cv-info")

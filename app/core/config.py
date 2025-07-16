@@ -64,6 +64,10 @@ class GlobalSettings(BaseSettings):
     # File Upload Configuration
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
+    AWS_REGION: str
+    AWS_S3_BUCKET_NAME: str
 
     @property
     def async_database_url(self) -> Optional[str]:
