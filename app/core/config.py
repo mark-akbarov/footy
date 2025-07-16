@@ -23,7 +23,6 @@ class GlobalSettings(BaseSettings):
     DOCS_PASSWORD: str = "admin"
 
     TRUSTED_HOSTS: Set[str] = {"app", "localhost", "0.0.0.0", "127.0.0.1"}
-    BACKEND_CORS_ORIGINS: List[str]
 
     ENVIRONMENT: EnvironmentEnum
     DEBUG: bool = True
