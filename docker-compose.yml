@@ -3,11 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    volumes:
-      - ./app:/usr/src/app
-      - ./uploads:/usr/src/app/uploads
-      - uploads_data:/usr/src/app/uploads
-
     ports:
       - "8000:8000"
     depends_on:
@@ -75,4 +70,3 @@ networks:
 
 volumes:
   postgres_data:
-  uploads_data:
