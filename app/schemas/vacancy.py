@@ -48,6 +48,7 @@ class OutVacancySchema(VacancySchemaBase):
     salary_max: Optional[Decimal] = None
     status: VacancyStatus
     team_id: int
+    team_name: Optional[str] = None  # Added team_name field
     created_at: datetime
     updated_at: datetime
 

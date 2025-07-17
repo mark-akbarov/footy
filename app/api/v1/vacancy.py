@@ -96,15 +96,22 @@ async def list_vacancies(
         position_type=position_type
     )
 
-    vacancies = await vacancy_crud.search_vacancies(
+    vacancies, total_count = await vacancy_crud.search_vacancies(
         search_params,
         limit=pagination.limit,
         offset=pagination.offset
     )
 
+    response_items = []
+    for vacancy in vacancies:
+        item = OutVacancySchema.model_validate(vacancy)
+        if vacancy.team:
+            item.team_name = vacancy.team.club_name
+        response_items.append(item)
+
     return PaginatedVacancySchema(
-        items=[OutVacancySchema.model_validate(v) for v in vacancies],
-        total=len(vacancies),
+        items=response_items,
+        total=total_count,
         limit=pagination.limit,
         offset=pagination.offset
     )
@@ -202,7 +209,7 @@ async def update_vacancy(
 
     # First, check if the vacancy exists
     existing_vacancy = await vacancy_crud.get_by_id(vacancy_id)
-    
+
     if not existing_vacancy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

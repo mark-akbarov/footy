@@ -48,27 +48,45 @@ class VacancyCrud(
         result = await self._db_session.execute(query)
         return result.scalars().all()
 
-    async def search_vacancies(self, params: VacancySearchSchema, limit: int, offset: int):
-        query = select(Vacancy).where(Vacancy.deleted_at.is_(None))  # Example filter
+    async def search_vacancies(
+        self,
+        params: VacancySearchSchema,
+        limit: int,
+        offset: int
+    ):
+        # Build base filters
+        filters = [self._table.deleted_at.is_(None)]
 
         if params.role:
-            query = query.where(Vacancy.role.ilike(f"%{params.role}%"))
+            filters.append(self._table.role.ilike(f"%{params.role}%"))
         if params.location:
-            query = query.where(Vacancy.location.ilike(f"%{params.location}%"))
-        if params.salary_min:
-            query = query.where(Vacancy.salary_min >= params.salary_min)
-        if params.salary_max:
-            query = query.where(Vacancy.salary_max <= params.salary_max)
+            filters.append(self._table.location.ilike(f"%{params.location}%"))
+        if params.salary_min is not None:
+            filters.append(self._table.salary_min >= params.salary_min)
+        if params.salary_max is not None:
+            filters.append(self._table.salary_max <= params.salary_max)
         if params.experience_level:
-            query = query.where(Vacancy.experience_level.ilike(f"%{params.experience_level}%"))
+            filters.append(self._table.experience_level.ilike(f"%{params.experience_level}%"))
         if params.position_type:
-            query = query.where(Vacancy.position_type.ilike(f"%{params.position_type}%"))
+            filters.append(self._table.position_type.ilike(f"%{params.position_type}%"))
 
-        # Print query to debug
-        print(str(query))
+        # Count total without joinedload
+        count_query = select(func.count()).select_from(self._table).where(*filters)
+        total_count_result = await self._db_session.execute(count_query)
+        total_count = total_count_result.scalar_one()
 
-        result = await self._db_session.execute(query.limit(limit).offset(offset))
-        return result.scalars().all()
+        # Main query with team join
+        paginated_query = (
+            select(self._table)
+            .options(joinedload(self._table.team))
+            .where(*filters)
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await self._db_session.execute(paginated_query)
+        vacancies = result.scalars().all()
+
+        return vacancies, total_count
 
     async def get_expired_vacancies(self) -> List[Vacancy]:
         """Get all expired vacancies."""
