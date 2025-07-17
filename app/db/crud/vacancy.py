@@ -1,9 +1,9 @@
-from typing import Optional, List, Type
+from typing import Optional, List, Type, Any, Coroutine
 from datetime import datetime
 
 from fastapi import HTTPException
 from sqlalchemy import select, and_, or_, func
-from sqlalchemy.orm import selectinload, InstrumentedAttribute
+from sqlalchemy.orm import selectinload, InstrumentedAttribute, joinedload
 
 from db.crud.base import BaseCrud
 from db.tables.vacancy import Vacancy, VacancyStatus
@@ -100,3 +100,42 @@ class VacancyCrud(
 
         # Convert the ORM model to a Pydantic schema
         return OutVacancySchema.model_validate(vacancy)
+
+    async def create_vacancy(self, in_schema: CreateVacancySchema, team_id: int) -> Vacancy:
+        """Create a new vacancy associated with a team."""
+        vacancy = self._table(**in_schema.model_dump(), team_id=team_id)
+        self._db_session.add(vacancy)
+        await self._db_session.commit()
+        await self._db_session.refresh(vacancy)
+        return vacancy
+
+    async def get_by_id_model(self, entry_id: int) -> Optional[Vacancy]:
+        """Get a vacancy model instance by its ID."""
+        query = select(self._table).options(joinedload(self._table.team)).where(self._table.id == entry_id)
+        result = await self._db_session.execute(query)
+        return result.scalars().first()
+
+    async def update(
+        self, obj_id: int, schema: UpdateVacancySchema, author_id: int
+    ) -> Optional[Vacancy]:
+        """Update a vacancy by its ID, with an authorization check."""
+        # Retrieve the SQLAlchemy model instance
+        vacancy_to_update = await self.get_by_id_model(obj_id)
+
+        if not vacancy_to_update:
+            return None  # Vacancy not found
+
+        # Authorization check: only the author can update
+        if vacancy_to_update.team_id != author_id:
+            # For better security, you might want to raise a 403 Forbidden HTTPException here
+            return None
+
+        # Update the model with data from the schema
+        update_data = schema.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(vacancy_to_update, field, value)
+
+        await self._db_session.commit()
+        await self._db_session.refresh(vacancy_to_update)
+
+        return vacancy_to_update

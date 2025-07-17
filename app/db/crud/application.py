@@ -1,14 +1,17 @@
 from typing import Optional, List, Type
 
+from fastapi import HTTPException
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload, InstrumentedAttribute
 
 from db.crud.base import BaseCrud
 from db.tables.application import Application, ApplicationStatus
-from schemas.application import CreateApplicationSchema, UpdateApplicationSchema, OutApplicationSchema, PaginatedApplicationSchema
+from schemas.application import CreateApplicationSchema, UpdateApplicationSchema, OutApplicationSchema, \
+    PaginatedApplicationSchema
 
 
-class ApplicationCrud(BaseCrud[CreateApplicationSchema, UpdateApplicationSchema, OutApplicationSchema, PaginatedApplicationSchema, Application]):
+class ApplicationCrud(BaseCrud[
+                          CreateApplicationSchema, UpdateApplicationSchema, OutApplicationSchema, PaginatedApplicationSchema, Application]):
     @property
     def _table(self) -> Type[Application]:
         return Application
@@ -24,6 +27,7 @@ class ApplicationCrud(BaseCrud[CreateApplicationSchema, UpdateApplicationSchema,
     @property
     def _paginated_schema(self) -> Type[PaginatedApplicationSchema]:
         return PaginatedApplicationSchema
+
     async def get_applications_by_candidate_id(self, candidate_id: int) -> List[Application]:
         """Get all applications for a candidate."""
         query = select(Application).where(Application.candidate_id == candidate_id)
@@ -60,13 +64,21 @@ class ApplicationCrud(BaseCrud[CreateApplicationSchema, UpdateApplicationSchema,
         result = await self._db_session.execute(query)
         return result.scalars().first()
 
-    async def update_application_status(self, application_id: int, status: ApplicationStatus) -> Optional[Application]:
-        """Update application status."""
-        application = await self.get_by_id(application_id)
-        if application:
-            application.status = status
-            await self._db_session.commit()
-            await self._db_session.refresh(application)
+    async def update_application_status(self, application_id: int, new_status: str) -> Application:
+        # Fetch the ORM model instance
+        result = await self._db_session.execute(
+            select(Application).where(Application.id == application_id)
+        )
+        application = result.scalar_one_or_none()
+
+        if not application:
+            raise HTTPException(status_code=404, detail="Application not found")
+
+        # Update the value
+        application.status = new_status
+        await self._db_session.commit()
+        await self._db_session.refresh(application)
+
         return application
 
     async def get_accepted_applications_by_candidate(self, candidate_id: int) -> List[Application]:
@@ -78,4 +90,4 @@ class ApplicationCrud(BaseCrud[CreateApplicationSchema, UpdateApplicationSchema,
             )
         )
         result = await self._db_session.execute(query)
-        return result.scalars().all() 
+        return result.scalars().all()

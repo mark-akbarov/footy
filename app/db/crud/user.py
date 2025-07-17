@@ -42,6 +42,12 @@ class UsersCrud(
     def _paginated_schema(self) -> Type[PaginatedUserSchema]:
         return PaginatedUserSchema
 
+    async def get_model_by_id(self, user_id: int) -> UserTable | None:
+        result = await self._db_session.execute(
+            select(UserTable).where(UserTable.id == user_id, UserTable.deleted_at.is_(None))
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_email(self, email: str) -> Optional[UserTable]:
         """Get user by email."""
         try:
@@ -118,7 +124,7 @@ class UsersCrud(
         stmt = select(self._table).where(self._table.id == team_id)
         result = await self._db_session.execute(stmt)
         team = result.scalar_one_or_none()
-        
+
         if team and team.role == UserRole.TEAM:
             team.is_approved = True
             await self._db_session.commit()
@@ -132,7 +138,7 @@ class UsersCrud(
         stmt = select(self._table).where(self._table.id == user_id)
         result = await self._db_session.execute(stmt)
         user = result.scalar_one_or_none()
-        
+
         if user:
             user.is_active = True
             await self._db_session.commit()
@@ -146,7 +152,7 @@ class UsersCrud(
         stmt = select(self._table).where(self._table.id == user_id)
         result = await self._db_session.execute(stmt)
         user = result.scalar_one_or_none()
-        
+
         if user:
             user.is_active = False
             await self._db_session.commit()

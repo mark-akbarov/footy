@@ -26,6 +26,7 @@ class GlobalSettings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = ["*"]
     BASE_URL: AnyHttpUrl = 'http://localhost:8000'
     
+
     ENVIRONMENT: EnvironmentEnum
     DEBUG: bool = True
 
@@ -69,6 +70,10 @@ class GlobalSettings(BaseSettings):
     # File Upload Configuration
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
+    AWS_REGION: str
+    AWS_S3_BUCKET_NAME: str
 
     @property
     def async_database_url(self) -> Optional[str]:
@@ -77,12 +82,6 @@ class GlobalSettings(BaseSettings):
             if self.DATABASE_URL
             else str(self.DATABASE_URL)
         )
-
-    # @property
-    # def cors_origins(self):
-    #     if isinstance(self.BACKEND_CORS_ORIGINS, str):
-    #         return json.loads(self.BACKEND_CORS_ORIGINS)
-    #     return self.BACKEND_CORS_ORIGINS
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True)
 

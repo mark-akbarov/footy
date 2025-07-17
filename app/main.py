@@ -16,7 +16,7 @@ from db.session import engine
 from api import v1
 
 description = """
-FastAPI template project 🚀
+FastAPI Footy project 🚀
 """
 version = "v0.0.1"
 
@@ -66,6 +66,15 @@ app = FastAPI(
     openapi_url=None,
 )
 
+# CORS middleware should be added BEFORE TrustedHostMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Consider restricting this in production
+    allow_credentials=True,
+    allow_methods=["GET", "PUT", "POST", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
+)
+
 app.add_middleware(TrustedHostMiddleware)
 
 # include routes here
@@ -101,12 +110,3 @@ async def redoc_ui(_: str = Depends(basic_http_credentials)):
         openapi_url="/openapi.json",
         title="ReDoc | API Docs",
     )
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["GET", "PUT", "POST", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
-)

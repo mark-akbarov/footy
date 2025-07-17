@@ -33,9 +33,9 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 # Membership pricing
 MEMBERSHIP_PRICES = {
-    MembershipPlan.BASIC: 9.99,
-    MembershipPlan.PREMIUM: 19.99,
-    MembershipPlan.PROFESSIONAL: 29.99
+    MembershipPlan.BASIC: 0.00,  # Free plan
+    MembershipPlan.PREMIUM: 4.99,
+    MembershipPlan.PROFESSIONAL: 9.99
 }
 
 
