@@ -16,7 +16,7 @@ from schemas.vacancy import (
     UpdateVacancySchema,
     OutVacancySchema,
     PaginatedVacancySchema,
-    VacancySearchSchema
+    VacancySearchSchema, PaginatedVacancyListSchema, OutVacancyListSchema
 )
 from schemas.user import OutUserSchema
 from api.v1.authentication import get_current_active_user
@@ -73,7 +73,7 @@ async def create_vacancy(
     return OutVacancySchema.model_validate(vacancy)
 
 
-@router.get("", response_model=PaginatedVacancySchema)
+@router.get("", response_model=PaginatedVacancyListSchema)
 async def list_vacancies(
     pagination: PaginationDep,
     db: AsyncSession = Depends(get_db_session),
@@ -104,12 +104,12 @@ async def list_vacancies(
 
     response_items = []
     for vacancy in vacancies:
-        item = OutVacancySchema.model_validate(vacancy)
+        item = OutVacancyListSchema.model_validate(vacancy)
         if vacancy.team:
             item.team_name = vacancy.team.club_name
         response_items.append(item)
 
-    return PaginatedVacancySchema(
+    return PaginatedVacancyListSchema(
         items=response_items,
         total=total_count,
         limit=pagination.limit,

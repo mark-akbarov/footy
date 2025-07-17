@@ -48,6 +48,21 @@ class OutVacancySchema(VacancySchemaBase):
     salary_max: Optional[Decimal] = None
     status: VacancyStatus
     team_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("status", mode="before")
+    def transform_status_to_lowercase(cls, value: str) -> str:
+        # Transform DB uppercase values to lowercase for API response
+        return value.lower() if isinstance(value, str) else value
+
+
+class OutVacancyListSchema(VacancySchemaBase):
+    id: int
+    salary_min: Optional[Decimal] = None
+    salary_max: Optional[Decimal] = None
+    status: VacancyStatus
+    team_id: int
     team_name: Optional[str] = None  # Added team_name field
     created_at: datetime
     updated_at: datetime
@@ -60,6 +75,10 @@ class OutVacancySchema(VacancySchemaBase):
 
 class PaginatedVacancySchema(BasePaginatedSchema[OutVacancySchema]):
     items: list[OutVacancySchema]
+
+
+class PaginatedVacancyListSchema(BasePaginatedSchema[OutVacancyListSchema]):
+    items: list[OutVacancyListSchema]
 
 
 class VacancySearchSchema(BaseSchema):
