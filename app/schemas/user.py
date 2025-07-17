@@ -71,6 +71,8 @@ class UpdateUserSchema(BaseSchema):
     # Team fields
     club_name: Optional[str] = None
     contact_phone: Optional[str] = None
+    
+    hashed_password: Optional[str] = None
 
     @field_validator('birthdate')
     def validate_birthdate(cls, v):
@@ -123,3 +125,13 @@ class CandidateSearchSchema(BaseSchema):
     experience_level: Optional[str] = None
     location: Optional[str] = None
     position: Optional[str] = None
+
+
+class ResetPasswordSchema(BaseSchema):
+    email: str
+    code: str
+
+
+class ChangePasswordSchema(BaseSchema):
+    new_password: str
+    new_password_repeated: str

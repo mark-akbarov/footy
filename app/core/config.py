@@ -23,6 +23,9 @@ class GlobalSettings(BaseSettings):
     DOCS_PASSWORD: str = "admin"
 
     TRUSTED_HOSTS: Set[str] = {"app", "localhost", "0.0.0.0", "127.0.0.1"}
+    BACKEND_CORS_ORIGINS: List[str] = ["*"]
+    BASE_URL: AnyHttpUrl = 'http://localhost:8000'
+    
 
     ENVIRONMENT: EnvironmentEnum
     DEBUG: bool = True
@@ -35,10 +38,11 @@ class GlobalSettings(BaseSettings):
     POSTGRES_HOST_PORT: int | None = None
     POSTGRES_CONTAINER_PORT: int | None = None
 
-    DATABASE_URL: Optional[PostgresDsn] = None
+    DATABASE_URL: Optional[PostgresDsn] = "postgresql://postgres:postgres@localhost:5432/footy"
     DB_ECHO_LOG: bool = True
 
     REDIS_URL: Optional[RedisDsn] = None
+    REDIS_TTL: int = 60 * 5 # in minutes
 
     BREVO_API_KEY: str
     MAIL_SMTP_PORT: str
@@ -53,6 +57,9 @@ class GlobalSettings(BaseSettings):
     JWT_SECRET_KEY: str = ''
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
+
+    # Reset Password 
+    RESET_PASSWORD_SECRET: str = 'reset_password'
 
     # Stripe Configuration
     STRIPE_PUBLIC_KEY: str = ''
