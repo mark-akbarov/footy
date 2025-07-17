@@ -202,6 +202,7 @@ async def update_vacancy(
 
     # First, check if the vacancy exists
     existing_vacancy = await vacancy_crud.get_by_id(vacancy_id)
+    
     if not existing_vacancy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -209,17 +210,10 @@ async def update_vacancy(
         )
 
     # Now, update the vacancy
-    updated_vacancy = await vacancy_crud.update(
-        obj_id=vacancy_id,
-        schema=vacancy_data,
-        author_id=current_user.id
+    updated_vacancy = await vacancy_crud.update_by_id(
+        vacancy_id,
+        in_data=vacancy_data,
     )
-
-    if not updated_vacancy:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vacancy could not be updated"
-        )
 
     return OutVacancySchema.model_validate(updated_vacancy)
 
