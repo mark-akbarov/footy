@@ -223,6 +223,7 @@ async def update_vacancy(
 
     return OutVacancySchema.model_validate(updated_vacancy)
 
+
 @router.delete("/{vacancy_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_vacancy(
     vacancy_id: int,
