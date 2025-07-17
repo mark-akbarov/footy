@@ -198,27 +198,30 @@ async def update_vacancy(
     db: AsyncSession = Depends(get_db_session),
     current_user: OutUserSchema = Depends(require_team_role)
 ):
-    """Update a vacancy."""
     vacancy_crud = VacancyCrud(db)
-    vacancy = await vacancy_crud.get_by_id(vacancy_id)
 
-    if not vacancy:
+    # First, check if the vacancy exists
+    existing_vacancy = await vacancy_crud.get_by_id(vacancy_id)
+    if not existing_vacancy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Vacancy not found"
         )
 
-    if vacancy.team_id != current_user.id:
+    # Now, update the vacancy
+    updated_vacancy = await vacancy_crud.update(
+        obj_id=vacancy_id,
+        schema=vacancy_data,
+        author_id=current_user.id
+    )
+
+    if not updated_vacancy:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only update your own vacancies"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vacancy could not be updated"
         )
 
-    updated_vacancy = await vacancy_crud.update_by_id(vacancy_id, vacancy_data)
-    await vacancy_crud.commit_session()
-
     return OutVacancySchema.model_validate(updated_vacancy)
-
 
 @router.delete("/{vacancy_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_vacancy(
