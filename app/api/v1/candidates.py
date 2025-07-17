@@ -1,3 +1,4 @@
+from io import BytesIO
 from typing import List, Optional
 import os
 import uuid
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies.database import get_db_session
 from api.dependencies.pagination import PaginationDep
+from db.crud.membership import MembershipCrud
 from db.crud.user import UsersCrud
 from db.tables.user import UserRole
 from schemas.user import (
@@ -18,6 +20,7 @@ from schemas.user import (
 )
 from api.v1.authentication import get_current_active_user
 from core.config import settings
+from utils.s3 import upload_cv_to_s3, generate_presigned_url, delete_file_from_s3
 
 router = APIRouter(
     prefix="/candidates",
@@ -204,11 +207,6 @@ async def upload_cv(
     current_user: OutUserSchema = Depends(require_candidate_role),
     file: UploadFile = File(...)
 ):
-    """Upload CV file for the current candidate (S3 version)."""
-    from db.crud.membership import MembershipCrud
-    from db.tables.membership import MembershipStatus
-    from utils.s3 import upload_file_to_s3, delete_file_from_s3, generate_presigned_url
-
     user_crud = UsersCrud(db)
     membership_crud = MembershipCrud(db)
 
@@ -220,14 +218,12 @@ async def upload_cv(
             detail="Active membership required to upload CV. Please purchase a membership first."
         )
 
-    # Validate file upload
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No file uploaded"
         )
 
-    # Validate file type
     allowed_extensions = ['.pdf', '.doc', '.docx']
     file_extension = os.path.splitext(file.filename)[1].lower()
     if file_extension not in allowed_extensions:
@@ -236,39 +232,46 @@ async def upload_cv(
             detail="Only PDF, DOC, and DOCX files are allowed"
         )
 
-    # Read and validate file size
+    # Read file into memory
     content = await file.read()
+
     if len(content) > settings.MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File size exceeds maximum limit of {settings.MAX_FILE_SIZE // (1024 * 1024)}MB"
+            detail=f"File size exceeds limit of {settings.MAX_FILE_SIZE // (1024 * 1024)}MB"
         )
 
-    # Get user
-    user = await user_crud.get_by_id(current_user.id)
+    # Get actual user model from DB
+    user = await user_crud.get_model_by_id(current_user.id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
 
-    # Remove old CV from S3 if exists
+    # Delete previous CV if exists
+    print(user.cv_file_path)
+    print("1111111111111111111111111111111111111111111111111111111111")
     if user.cv_file_path:
         try:
             delete_file_from_s3(user.cv_file_path)
         except Exception as e:
-            print(f"Warning: failed to delete old CV from S3: {e}")
+            print(f"Warning: Failed to delete old CV from S3: {e}")
 
-    # Upload new CV
+    # Upload new CV and update user in a transaction
     try:
-        s3_key = upload_file_to_s3(content, file.filename, file.content_type)
+        s3_key = upload_cv_to_s3(
+            file_obj=BytesIO(content),
+            filename=file.filename,
+            content_type=file.content_type
+        )
         user.cv_file_path = s3_key
-        await user_crud.commit_session()
+        await user_crud.commit_session()  # Use the CRUD's commit method
     except Exception as e:
         print(f"Error uploading to S3 or updating DB: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error uploading file"
+            detail="Error processing file"
         )
 
     download_url = generate_presigned_url(s3_key)
@@ -329,7 +332,7 @@ async def delete_cv(
     user_crud = UsersCrud(db)
 
     # Get user
-    user = await user_crud.get_by_id(current_user.id)
+    user = await user_crud.get_model_by_id(current_user.id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
