@@ -250,8 +250,6 @@ async def upload_cv(
         )
 
     # Delete previous CV if exists
-    print(user.cv_file_path)
-    print("1111111111111111111111111111111111111111111111111111111111")
     if user.cv_file_path:
         try:
             delete_file_from_s3(user.cv_file_path)

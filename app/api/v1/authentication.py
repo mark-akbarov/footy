@@ -189,7 +189,7 @@ async def register_team(
             detail="Password hashing failed.",
         )
 
-    print("!!!!!! DEBUG: Data before creating team:", user_data) # DEBUG STATEMENT
+    print("!!!!!! DEBUG: Data before creating team:", user_data)  # DEBUG STATEMENT
     print(f"User data being inserted: {user_data}")
 
     # Create user
@@ -261,9 +261,9 @@ async def read_users_me(current_user: OutUserSchema = Depends(get_current_active
     return current_user
 
 
-@router.patch("/profile", response_class=UpdateUserSchema)
+@router.patch("/profile", response_model=OutUserSchema)
 async def update_user_profile(
-    current_user: GetActiveUserDep, 
+    current_user: GetActiveUserDep,
     profile_data: UpdateUserSchema,
     db_session: DbSessionDep
 ):
@@ -271,12 +271,12 @@ async def update_user_profile(
     await users_crud.update_by_id(current_user.id, profile_data)
     await users_crud.commit_session()
     result = await users_crud.get_by_id(current_user.id)
-    return result    
+    return result
 
 
-@router.post("/reset-password",)
+@router.post("/reset-password", )
 async def reset_password_endpoint(
-    current_user: GetActiveUserDep, 
+    current_user: GetActiveUserDep,
     db_session: DbSessionDep,
     cache: RedisCacheDep
 ):
@@ -284,8 +284,8 @@ async def reset_password_endpoint(
     user = await users_crud.get_by_id(current_user.id)
     code = generate_verification_code()
     generated_hash = jwt.encode(
-        {"code": code, "email": user.email}, 
-        key=settings.RESET_PASSWORD_SECRET, 
+        {"code": code, "email": user.email},
+        key=settings.RESET_PASSWORD_SECRET,
         algorithm="HS512"
     )
     reset_link = f"settings.BASE_URL/v1/auth/verify-otp/?info={generated_hash}"
@@ -298,36 +298,36 @@ async def reset_password_endpoint(
             "email": user.email,
             "reset_link": reset_link,
         }
-        }
+    }
     )
     return
 
 
-@router.post("/verify-otp",)
+@router.post("/verify-otp", )
 async def verify_otp_password_endpoint(
     cache: RedisCacheDep,
     info_hash: str
 ):
     try:
         data = jwt.decode(
-            info_hash, 
-            key=settings.RESET_PASSWORD_SECRET, 
+            info_hash,
+            key=settings.RESET_PASSWORD_SECRET,
             algorithm="HS512"
         )
     except Exception as exc:
         raise exc
-    
+
     email = data['email']
     verification_code = data['code']
     code = cache.get(email)
-    
+
     if verification_code != code:
         raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
-    
+
     return {"success": True}
 
 
-@router.post("/change-password",)
+@router.post("/change-password", )
 async def change_password_endpoint(
     db_session: DbSessionDep,
     current_user: GetActiveUserDep,
@@ -335,13 +335,13 @@ async def change_password_endpoint(
 ):
     if payload.new_password != payload.new_password_repeated:
         raise HTTPException(status_code=400, detail="Password don't match")
-    
+
     try:
         users_crud = UsersCrud(db_session)
         hashed_password = get_password_hash(password=payload.new_password)
         await users_crud.update_by_id(current_user.id, {'hashed_password': hashed_password})
         await users_crud.commit_session()
-        return {"success": True}    
+        return {"success": True}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=exc)
 

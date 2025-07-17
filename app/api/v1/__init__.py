@@ -12,7 +12,6 @@ from .candidates import router as candidates_router
 from .payment import router as payment_router
 
 api_router = APIRouter(prefix=settings.API_V1_STR)
-# api_router.include_router(blog_post_router)
 api_router.include_router(auth_router)
 api_router.include_router(vacancy_router)
 api_router.include_router(application_router)
