@@ -1,3 +1,5 @@
+from typing import Annotated
+from fastapi import Depends
 from redis.asyncio import Redis
 from typing import Optional, Any
 import json
@@ -45,3 +47,6 @@ class RedisManager:
         """Close Redis connection"""
         if cls.redis:
             await cls.redis.close()
+
+
+RedisCacheDep = Annotated[Redis, Depends(RedisManager.get_client)]

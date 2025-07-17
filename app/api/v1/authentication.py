@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Annotated
 import random
 import string
 
@@ -10,16 +10,19 @@ from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies.database import get_db_session
+from api.dependencies.database import get_db_session, DbSessionDep
 from db.crud.user import UsersCrud
 from db.tables.user import UserRole
 from schemas.user import (
     CandidateRegistrationSchema,
     TeamRegistrationSchema,
-    OutUserSchema
+    OutUserSchema,
+    UpdateUserSchema,
+    ResetPasswordSchema,
+    ChangePasswordSchema,
 )
 from core.config import settings
-from utils.redis_manager import RedisManager
+from utils.redis_manager import RedisManager, RedisCacheDep
 from tasks.notifications.send_email import send_email_task
 
 router = APIRouter(
@@ -84,10 +87,16 @@ async def get_current_user(
     return OutUserSchema.model_validate(user)
 
 
+GetUserDep = Annotated[OutUserSchema, Depends(get_current_user)]
+
+
 async def get_current_active_user(current_user: OutUserSchema = Depends(get_current_user)) -> OutUserSchema:
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+
+GetActiveUserDep = Annotated[OutUserSchema, Depends(get_current_active_user)]
 
 
 @router.post("/register-candidate", response_model=OutUserSchema, status_code=status.HTTP_201_CREATED)
@@ -207,8 +216,9 @@ async def register_team(
 
 @router.post("/login", response_model=Token)
 async def login(
+    db: DbSessionDep,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_db_session)):
+):
     """Login user with email and password."""
     user_crud = UsersCrud(db)
     user = await user_crud.get_by_email(form_data.username)
@@ -249,6 +259,91 @@ async def login(
 async def read_users_me(current_user: OutUserSchema = Depends(get_current_active_user)):
     """Get current user information."""
     return current_user
+
+
+@router.patch("/profile", response_class=UpdateUserSchema)
+async def update_user_profile(
+    current_user: GetActiveUserDep, 
+    profile_data: UpdateUserSchema,
+    db_session: DbSessionDep
+):
+    users_crud = UsersCrud(db_session=db_session)
+    await users_crud.update_by_id(current_user.id, profile_data)
+    await users_crud.commit_session()
+    result = await users_crud.get_by_id(current_user.id)
+    return result    
+
+
+@router.post("/reset-password",)
+async def reset_password_endpoint(
+    current_user: GetActiveUserDep, 
+    db_session: DbSessionDep,
+    cache: RedisCacheDep
+):
+    users_crud = UsersCrud(db_session)
+    user = await users_crud.get_by_id(current_user.id)
+    code = generate_verification_code()
+    generated_hash = jwt.encode(
+        {"code": code, "email": user.email}, 
+        key=settings.RESET_PASSWORD_SECRET, 
+        algorithm="HS512"
+    )
+    reset_link = f"settings.BASE_URL/v1/auth/verify-otp/?info={generated_hash}"
+    cache.setex(user.email, settings.REDIS_TTL, code)
+    send_email_task.apply_async(kwargs={
+        "to_email": user.email,
+        "subject": "Reset Your Password",
+        "template": "reset_password",
+        "context": {
+            "email": user.email,
+            "reset_link": reset_link,
+        }
+        }
+    )
+    return
+
+
+@router.post("/verify-otp",)
+async def verify_otp_password_endpoint(
+    cache: RedisCacheDep,
+    info_hash: str
+):
+    try:
+        data = jwt.decode(
+            info_hash, 
+            key=settings.RESET_PASSWORD_SECRET, 
+            algorithm="HS512"
+        )
+    except Exception as exc:
+        raise exc
+    
+    email = data['email']
+    verification_code = data['code']
+    code = cache.get(email)
+    
+    if verification_code != code:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
+    
+    return {"success": True}
+
+
+@router.post("/change-password",)
+async def change_password_endpoint(
+    db_session: DbSessionDep,
+    current_user: GetActiveUserDep,
+    payload: ChangePasswordSchema,
+):
+    if payload.new_password != payload.new_password_repeated:
+        raise HTTPException(status_code=400, detail="Password don't match")
+    
+    try:
+        users_crud = UsersCrud(db_session)
+        hashed_password = get_password_hash(password=payload.new_password)
+        await users_crud.update_by_id(current_user.id, {'hashed_password': hashed_password})
+        await users_crud.commit_session()
+        return {"success": True}    
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=exc)
 
 
 def generate_verification_code() -> str:
