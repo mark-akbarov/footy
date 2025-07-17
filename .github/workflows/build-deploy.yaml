@@ -28,6 +28,7 @@ jobs:
         run: |
           echo "Deploying application stack..."
           if [ "$GITHUB_REF" == "refs/heads/main" ]; then
+            docker-compose -f docker-compose.yml down || true
             docker-compose -f docker-compose.yml up -d --build
             echo "Deployment successful."
           else
