@@ -1,9 +1,11 @@
+import os
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 from typing import Optional, Annotated
 import random
 import string
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -12,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies.database import get_db_session, DbSessionDep
 from api.dependencies.user import get_current_active_user, get_current_user
+from api.v1.application import require_team_role
 from api.v1.membership import MEMBERSHIP_PRICES
 from db.crud.membership import MembershipCrud
 from db.crud.user import UsersCrud
@@ -28,6 +31,7 @@ from schemas.user import (
 from core.config import settings
 from utils.redis_manager import RedisManager, RedisCacheDep
 from tasks.notifications.send_email import send_email_task
+from utils.s3 import delete_file_from_s3, upload_cv_to_s3, generate_presigned_url
 
 router = APIRouter(
     prefix="/auth",
@@ -377,3 +381,76 @@ async def verify_email(
     await RedisManager.delete(redis_key)
 
     return {"message": "Email verified successfully, account activated"}
+
+
+@router.post("/upload-logo")
+async def upload_logo(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_team_role),
+    file: UploadFile = File(...)
+):
+    user_crud = UsersCrud(db)
+
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No file uploaded"
+        )
+
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+    file_extension = os.path.splitext(file.filename)[1].lower()
+
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only image files (PNG, JPG, JPEG, WEBP) are allowed"
+        )
+
+    content = await file.read()
+
+    if len(content) > settings.MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File size exceeds {settings.MAX_FILE_SIZE // (1024 * 1024)}MB limit"
+        )
+
+    user = await user_crud.get_model_by_id(current_user.id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Delete previous logo if exists
+    if user.logo_file_path:
+        try:
+            delete_file_from_s3(user.logo_file_path)
+        except Exception as e:
+            print(f"Warning: Failed to delete old logo: {e}")
+
+    # Upload new logo
+    try:
+        s3_key = upload_cv_to_s3(
+            file_obj=BytesIO(content),
+            filename=file.filename,
+            content_type=file.content_type,
+            folder="logos"
+        )
+        user.logo_file_path = s3_key
+        await user_crud.commit_session()
+    except Exception as e:
+        print(f"Error uploading logo: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error processing file"
+        )
+
+    download_url = generate_presigned_url(s3_key)
+
+    return {
+        "message": "Logo uploaded successfully",
+        "filename": file.filename,
+        "file_size": len(content),
+        "file_path": s3_key,
+        "download_url": download_url
+    }
