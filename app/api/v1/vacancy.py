@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies.database import get_db_session
 from api.dependencies.pagination import PaginationDep
+from api.dependencies.user import get_current_active_user
 from db.crud.vacancy import VacancyCrud
 from db.tables.user import UserRole
 from db.tables.vacancy import VacancyStatus, Vacancy
@@ -19,7 +20,7 @@ from schemas.vacancy import (
     VacancySearchSchema, PaginatedVacancyListSchema, OutVacancyListSchema
 )
 from schemas.user import OutUserSchema
-from api.v1.authentication import get_current_active_user
+
 
 router = APIRouter(
     prefix="/vacancies",

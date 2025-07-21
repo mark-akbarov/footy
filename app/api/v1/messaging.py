@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies.database import get_db_session
+from api.dependencies.user import get_current_active_user
 from db.crud.message import MessageCrud
 from db.crud.user import UsersCrud
 from db.tables.user import UserRole
@@ -15,7 +16,7 @@ from schemas.message import (
     PaginatedMessageSchema
 )
 from schemas.user import OutUserSchema
-from api.v1.authentication import get_current_active_user
+
 
 router = APIRouter(
     prefix="/messages",

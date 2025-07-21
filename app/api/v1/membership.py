@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies.database import get_db_session
+from api.dependencies.user import get_current_active_user
 from db.crud.membership import MembershipCrud
 from db.crud.user import UsersCrud
 from db.tables.user import UserRole
@@ -18,7 +19,6 @@ from schemas.membership import (
     PaginatedMembershipSchema
 )
 from schemas.user import OutUserSchema
-from api.v1.authentication import get_current_active_user
 from core.config import settings
 from utils.stripe_utils import create_stripe_checkout_session, get_checkout_items
 

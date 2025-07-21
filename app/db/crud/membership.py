@@ -6,10 +6,12 @@ from sqlalchemy.orm import selectinload, InstrumentedAttribute
 
 from db.crud.base import BaseCrud
 from db.tables.membership import Membership, MembershipStatus
-from schemas.membership import CreateMembershipSchema, UpdateMembershipSchema, OutMembershipSchema, PaginatedMembershipSchema
+from schemas.membership import CreateMembershipSchema, UpdateMembershipSchema, OutMembershipSchema, \
+    PaginatedMembershipSchema
 
 
-class MembershipCrud(BaseCrud[CreateMembershipSchema, UpdateMembershipSchema, OutMembershipSchema, PaginatedMembershipSchema, Membership]):
+class MembershipCrud(BaseCrud[
+                         CreateMembershipSchema, UpdateMembershipSchema, OutMembershipSchema, PaginatedMembershipSchema, Membership]):
     @property
     def _table(self) -> Type[Membership]:
         return Membership
@@ -61,4 +63,18 @@ class MembershipCrud(BaseCrud[CreateMembershipSchema, UpdateMembershipSchema, Ou
             membership.status = status
             await self._db_session.commit()
             await self._db_session.refresh(membership)
-        return membership 
+        return membership
+
+    async def create_membership(self, membership_data: dict):
+        """Create a new membership."""
+        try:
+            print("!!!!!! DEBUG: Data before creating membership:", membership_data)
+            membership = Membership(**membership_data)
+            self._db_session.add(membership)
+            await self._db_session.commit()
+            await self._db_session.refresh(membership)
+            return "ok"
+        except Exception as e:
+            await self._db_session.rollback()
+            print("!!!!! ERROR inserting membership:", e)
+            raise

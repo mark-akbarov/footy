@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies.database import get_db_session
+from api.dependencies.user import get_current_active_user
 from db.crud.application import ApplicationCrud
 from db.crud.vacancy import VacancyCrud
 from db.tables.user import UserRole
@@ -14,7 +15,6 @@ from schemas.application import (
     ApplicationStatusUpdateSchema
 )
 from schemas.user import OutUserSchema
-from api.v1.authentication import get_current_active_user
 
 router = APIRouter(
     prefix="/applications",

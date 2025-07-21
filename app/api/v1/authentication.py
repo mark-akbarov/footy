@@ -1,17 +1,21 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Annotated
 import random
 import string
 
 from fastapi import APIRouter, HTTPException, Depends, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies.database import get_db_session, DbSessionDep
+from api.dependencies.user import get_current_active_user, get_current_user
+from api.v1.membership import MEMBERSHIP_PRICES
+from db.crud.membership import MembershipCrud
 from db.crud.user import UsersCrud
+from db.tables.membership import MembershipStatus, MembershipPlan
 from db.tables.user import UserRole
 from schemas.user import (
     CandidateRegistrationSchema,
@@ -36,7 +40,6 @@ ALGORITHM = settings.JWT_ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
 class Token(BaseModel):
@@ -63,38 +66,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db_session)
-) -> OutUserSchema:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-
-    user_crud = UsersCrud(db)
-    user = await user_crud.get_by_email(email=email)
-    if user is None:
-        raise credentials_exception
-    return OutUserSchema.model_validate(user)
-
-
 GetUserDep = Annotated[OutUserSchema, Depends(get_current_user)]
-
-
-async def get_current_active_user(current_user: OutUserSchema = Depends(get_current_user)) -> OutUserSchema:
-    if not current_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
-
 
 GetActiveUserDep = Annotated[OutUserSchema, Depends(get_current_active_user)]
 
@@ -123,11 +95,28 @@ async def register_candidate(
     user_data["hashed_password"] = hashed_password
     del user_data["password"]
 
-    print("!!!!!! DEBUG: Data before creating user:", user_data)  # DEBUG STATEMENT
+    try:
+        # Create user but don't commit yet
+        user = await user_crud.create(user_data)
 
-    # Create user
-    user = await user_crud.create(user_data)
-    await user_crud.commit_session()
+        membership_crud = MembershipCrud(db)
+        membership_data = {
+            "user_id": user.id,
+            "plan_type": MembershipPlan.BASIC.value,  # ✅ .value returns 'basic'
+            "status": MembershipStatus.PENDING.value,  # ✅ 'pending'
+            "price": MEMBERSHIP_PRICES[MembershipPlan.BASIC],
+            "start_date": datetime.utcnow(),
+            "renewal_date": datetime.utcnow() + timedelta(days=30),
+        }
+
+        await membership_crud.create(membership_data)
+
+        # Commit both user and membership together
+        await membership_crud.commit_session()
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Failed to register candidate.") from e
 
     # Send email verification
     verification_code = generate_verification_code()
