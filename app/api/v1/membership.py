@@ -22,7 +22,6 @@ from schemas.user import OutUserSchema
 from core.config import settings
 from utils.stripe_utils import create_stripe_checkout_session, get_checkout_items
 
-
 router = APIRouter(
     prefix="/memberships",
     tags=["Memberships"],
@@ -76,7 +75,7 @@ async def create_checkout_session(
     try:
         membership_crud = MembershipCrud(db_session)
         active_membership = await membership_crud.get_active_membership_by_user_id(current_user.id)
-        
+
         if active_membership:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -90,20 +89,20 @@ async def create_checkout_session(
                 detail="Invalid membership plan"
             )
 
-        items = await get_checkout_items(price=int(amount*100))
+        items = await get_checkout_items(price=int(amount * 100))
         session = await create_stripe_checkout_session(
-            items=items, 
-            customer_email=current_user.email, 
-            user_id=current_user.id, 
+            items=items,
+            customer_email=current_user.email,
+            user_id=current_user.id,
             plan_type=payment_data.plan_type
-        )  
-        
+        )
+
         return {
-            'checkout_session_id': session.id, 
-            'client_secret': session.client_secret, 
+            'checkout_session_id': session.id,
+            'client_secret': session.client_secret,
             'payment_intent': session.payment_intent
         }
-        
+
     except stripe.error.StripeError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -137,20 +136,20 @@ async def create_payment_intent(
         # Check if user already has an active membership
         membership_crud = MembershipCrud(db)
         active_membership = await membership_crud.get_active_membership_by_user_id(current_user.id)
-        
+
         if active_membership:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="You already have an active membership"
             )
-        
+
         amount = MEMBERSHIP_PRICES.get(payment_data.plan_type)
         if not amount:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid membership plan"
             )
-        
+
         intent = stripe.PaymentIntent.create(
             amount=int(amount * 100),
             currency='usd',
@@ -160,14 +159,14 @@ async def create_payment_intent(
                 'user_email': current_user.email
             }
         )
-        
+
         return {
             "client_secret": intent.client_secret,
             "payment_intent_id": intent.id,
             "amount": amount,
             "currency": "usd"
         }
-        
+
     except stripe.error.StripeError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -185,27 +184,27 @@ async def confirm_payment(
     try:
         # Verify payment intent
         intent = stripe.PaymentIntent.retrieve(payment_data.payment_intent_id)
-        
+
         if intent.status != 'succeeded':
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Payment not completed"
             )
-        
+
         # Verify the payment belongs to this user
         if str(current_user.id) != intent.metadata.get('user_id'):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Payment does not belong to current user"
             )
-        
+
         # Create membership
         membership_crud = MembershipCrud(db)
         user_crud = UsersCrud(db)
-        
+
         start_date = datetime.now()
         renewal_date = start_date + timedelta(days=30)  # 30-day subscription
-        
+
         membership_data = {
             "user_id": current_user.id,
             "plan_type": payment_data.plan_type,
@@ -215,15 +214,15 @@ async def confirm_payment(
             "renewal_date": renewal_date,
             "stripe_payment_intent_id": payment_data.payment_intent_id
         }
-        
+
         membership = await membership_crud.create(membership_data)
-        
+
         await user_crud.activate_user(current_user.id)
-        
+
         await membership_crud.commit_session()
-        
+
         return OutMembershipSchema.model_validate(membership)
-        
+
     except stripe.error.StripeError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -239,13 +238,13 @@ async def get_my_membership(
     """Get current user's active membership."""
     membership_crud = MembershipCrud(db)
     membership = await membership_crud.get_active_membership_by_user_id(current_user.id)
-    
+
     if not membership:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No active membership found"
         )
-    
+
     return OutMembershipSchema.model_validate(membership)
 
 
@@ -257,7 +256,7 @@ async def get_membership_history(
     """Get membership history for current user."""
     membership_crud = MembershipCrud(db)
     memberships = await membership_crud.get_memberships_by_user_id(current_user.id)
-    
+
     return [OutMembershipSchema.model_validate(m) for m in memberships]
 
 
@@ -269,7 +268,7 @@ async def upgrade_membership(
 ):
     """Upgrade membership plan."""
     membership_crud = MembershipCrud(db)
-    
+
     # Get current membership
     current_membership = await membership_crud.get_active_membership_by_user_id(current_user.id)
     if not current_membership:
@@ -277,27 +276,27 @@ async def upgrade_membership(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No active membership to upgrade"
         )
-    
+
     # Check if new plan is actually an upgrade
     current_plan_value = list(MembershipPlan).index(current_membership.plan_type)
     new_plan_value = list(MembershipPlan).index(new_plan.plan_type)
-    
+
     if new_plan_value <= current_plan_value:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New plan must be higher tier than current plan"
         )
-    
+
     # Calculate pro-rated amount
     days_remaining = (current_membership.renewal_date - datetime.utcnow()).days
     new_price = MEMBERSHIP_PRICES[new_plan.plan_type]
     current_price = float(current_membership.price)
-    
+
     # Simple pro-ration calculation
     daily_current = current_price / 30
     daily_new = new_price / 30
     upgrade_amount = (daily_new - daily_current) * days_remaining
-    
+
     try:
         # Create payment intent for upgrade
         intent = stripe.PaymentIntent.create(
@@ -310,14 +309,14 @@ async def upgrade_membership(
                 'current_membership_id': current_membership.id
             }
         )
-        
+
         return {
             "client_secret": intent.client_secret,
             "amount": upgrade_amount,
             "currency": "usd",
             "message": "Complete payment to upgrade your membership"
         }
-        
+
     except stripe.error.StripeError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -373,7 +372,7 @@ async def stripe_webhook(
         # Get the webhook payload
         payload = await request.body()
         sig_header = request.headers.get('stripe-signature')
-        
+
         if not sig_header:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -395,7 +394,7 @@ async def stripe_webhook(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid signature"
             )
-        
+
         # Handle the event
         if event['type'] == 'payment_intent.succeeded':
             payment_intent = event['data']['object']
@@ -403,9 +402,9 @@ async def stripe_webhook(
         elif event['type'] == 'payment_intent.payment_failed':
             payment_intent = event['data']['object']
             await handle_payment_failure(payment_intent, db)
-        
+
         return {"status": "success"}
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -417,7 +416,7 @@ async def handle_payment_success(payment_intent: dict, db: AsyncSession):
     """Handle successful payment."""
     membership_crud = MembershipCrud(db)
     user_crud = UsersCrud(db)
-    
+
     user_id = int(payment_intent['metadata'].get('user_id'))
     plan_type = MembershipPlan(payment_intent['metadata'].get('plan_type'))
 
@@ -425,10 +424,10 @@ async def handle_payment_success(payment_intent: dict, db: AsyncSession):
     existing_membership = await membership_crud.get_active_membership_by_user_id(user_id)
     if existing_membership:
         return  # Already processed
-    
+
     start_date = datetime.now()
     renewal_date = start_date + timedelta(days=30)
-    
+
     membership_data = {
         "user_id": user_id,
         "plan_type": plan_type,
@@ -448,4 +447,50 @@ async def handle_payment_failure(payment_intent: dict, db: AsyncSession):
     """Handle failed payment."""
     # Log the failure for monitoring
     print(f"Payment failed for user {payment_intent['metadata'].get('user_id')}")
-    # In production, you might want to send an email to the user 
+    # In production, you might want to send an email to the user
+
+
+@router.put("/change_membership")
+async def change_membership(
+    new_plan: CreatePaymentIntentSchema,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: OutUserSchema = Depends(require_candidate_role)
+):
+    membership_crud = MembershipCrud(db)
+    current_membership = await membership_crud.get_active_membership_by_user_id(current_user.id)
+
+    if not current_membership:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active membership to change"
+        )
+
+    # Must compare using `.value` because DB stores strings
+    if current_membership.plan_type == new_plan.plan_type.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are already on this plan"
+        )
+
+    now = datetime.utcnow()
+    days_remaining = max(0, (current_membership.renewal_date - now).days)
+    new_price = MEMBERSHIP_PRICES[new_plan.plan_type]
+    current_price = float(current_membership.price)
+
+    # Pro-rata calculation
+    daily_current = current_price / 30
+    daily_new = new_price / 30
+    change_amount = round((daily_new - daily_current) * days_remaining, 2)
+
+    current_membership.plan_type = new_plan.plan_type.value  # ✅ Save string to DB
+    current_membership.price = new_price
+    current_membership.renewal_date = now + timedelta(days=30)
+    current_membership.status = MembershipStatus.ACTIVE.value  # ✅ Save string to DB
+
+    await membership_crud.commit_session()
+
+    return {
+        "amount": change_amount,
+        "currency": "usd",
+        "message": "Complete payment to upgrade your membership"
+    }
